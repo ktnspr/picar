@@ -6,8 +6,9 @@ Zwei Wege, den SunFounder PiCar-X V2.0 fernzusteuern – jeweils mit Livebild de
 |---|---|---|
 | `handy_fernsteuerung/` | Bedienfeld im Handy-Browser (Knöpfe und Schieberegler) | `http://<IP-des-Pi>:8000` |
 | `controller_fernsteuerung/` | Nintendo Switch Pro Controller per Bluetooth; Browser zeigt das Kamerabild im Vollbild | `http://<IP-des-Pi>:8001` |
+| `end2end/` | Eigenständiges Projekt: Ein neuronales Netz lernt, einer Linie zu folgen (eigene [README](end2end/README.md)) | `http://<IP-des-Pi>:8080` |
 
-**Immer nur eines der beiden Programme starten** – beide brauchen Kamera und Motoren.
+**Immer nur eines der Programme starten** – alle brauchen Kamera und Motoren.
 
 ## Voraussetzungen
 

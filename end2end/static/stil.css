@@ -1,0 +1,196 @@
+/* Aussehen der Weboberfläche (für den Notebook-Bildschirm gedacht) */
+
+:root {
+  --hintergrund: #15181d;
+  --flaeche: #1f232a;
+  --rand: #3c4048;
+  --text: #e8eaed;
+  --text-leise: #9aa0a6;
+  --blau: #4f8cff;
+  --gruen: #1e8e3e;
+  --gruen-hell: #3ecf5e;
+  --rot: #c62828;
+  --rot-hell: #ff6b66;
+  --gelb: #f5c518;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--hintergrund);
+  color: var(--text);
+  font-family: system-ui, sans-serif;
+  font-size: 15px;
+}
+
+.versteckt { display: none !important; }
+
+/* ---------- Kopfzeile ---------- */
+
+header {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  padding: 10px 20px;
+  background: var(--flaeche);
+  border-bottom: 1px solid var(--rand);
+}
+header h1 { font-size: 18px; margin: 0; }
+header nav a {
+  color: var(--text-leise);
+  text-decoration: none;
+  margin-right: 14px;
+}
+header nav a.aktiv { color: var(--text); border-bottom: 2px solid var(--blau); }
+.abstand { flex: 1; }
+#verbindung.weg { color: var(--rot-hell); font-weight: bold; }
+
+/* Temperaturanzeige: grün – gelb – rot (mit Punkt davor, damit es nicht nur an der Farbe hängt) */
+#temperatur::before { content: "●"; margin-right: 5px; }
+#temperatur.kuehl::before { color: var(--gruen-hell); }
+#temperatur.warm::before { color: var(--gelb); }
+#temperatur.heiss { color: var(--rot-hell); font-weight: bold; }
+#temperatur.heiss::before { color: var(--rot-hell); }
+
+/* Der große Ein/Aus-Schalter für die Motoren */
+#motorschalter {
+  font-size: 18px;
+  font-weight: bold;
+  padding: 10px 22px;
+  border-radius: 10px;
+  border: 2px solid var(--rand);
+  background: #444;
+  color: var(--text);
+  cursor: pointer;
+  min-width: 210px;
+}
+#motorschalter.an { background: var(--gruen); border-color: var(--gruen-hell); }
+#motorschalter.gesperrt { background: #333; color: var(--text-leise); cursor: not-allowed; }
+
+/* ---------- Hauptbereich ---------- */
+
+main {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(360px, 1fr);
+  gap: 20px;
+  padding: 20px;
+}
+
+#livebild {
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  background: #000;
+  border-radius: 10px;
+  object-fit: contain;
+}
+
+.karte {
+  background: var(--flaeche);
+  border: 1px solid var(--rand);
+  border-radius: 10px;
+  padding: 16px;
+  margin-bottom: 16px;
+}
+.karte h2 { font-size: 16px; margin: 0 0 12px; }
+.hinweis { color: var(--text-leise); font-size: 13px; }
+
+/* Reiter für die drei Modi */
+.reiter { display: flex; gap: 6px; margin-bottom: 16px; }
+.reiter button { flex: 1; }
+.reiter button.aktiv { background: var(--blau); border-color: var(--blau); color: white; }
+
+button {
+  font: inherit;
+  color: var(--text);
+  background: #2d323b;
+  border: 1px solid var(--rand);
+  border-radius: 8px;
+  padding: 8px 14px;
+  cursor: pointer;
+}
+button:hover { border-color: var(--blau); }
+button:disabled { opacity: 0.4; cursor: not-allowed; }
+button.wichtig { background: var(--gruen); border-color: var(--gruen-hell); color: white; }
+button.gefahr { background: var(--rot); border-color: var(--rot-hell); color: white; }
+
+.netzbild { margin: 6px 0 10px; }
+.netzbild img {
+  display: block;
+  width: 100%;
+  max-width: 480px;
+  margin-top: 4px;
+  border-radius: 4px;
+  image-rendering: pixelated;   /* die einzelnen Pixel sichtbar lassen */
+}
+
+.statuszeile { display: flex; justify-content: space-between; margin-bottom: 12px; }
+.knopfzeile { display: flex; gap: 8px; margin-bottom: 8px; }
+.knopfzeile button { flex: 1; }
+.gut { color: var(--gruen-hell); }
+.schlecht { color: var(--rot-hell); font-weight: bold; }
+#aufnahme-knopf.laeuft { background: var(--rot); border-color: var(--rot-hell); }
+#pause-knopf.aktiv { background: var(--gelb); color: #000; }
+
+/* Liste der Fahrten (und später der Modelle) */
+.eintrag {
+  display: grid;
+  grid-template-columns: 120px 1fr auto;
+  gap: 12px;
+  align-items: center;
+  padding: 8px 0;
+  border-top: 1px solid var(--rand);
+}
+.eintrag img { width: 120px; border-radius: 6px; }
+.eintrag .name { font-weight: bold; color: var(--text); }
+.eintrag .details { font-size: 13px; color: var(--text-leise); }
+.eintrag .aktionen { display: flex; flex-direction: column; gap: 4px; }
+.eintrag .aktionen button { padding: 4px 10px; font-size: 13px; }
+
+/* ---------- Autonom fahren ---------- */
+
+select {
+  font: inherit; color: var(--text); background: #2d323b;
+  border: 1px solid var(--rand); border-radius: 8px; padding: 6px 8px; width: 100%;
+}
+button.gross { width: 100%; font-size: 20px; font-weight: bold; padding: 14px; margin: 8px 0; }
+.autonom-werte { font-size: 15px; margin: 8px 0; }
+.autonom-werte dd { font-variant-numeric: tabular-nums; }
+
+/* ---------- Training ---------- */
+
+button.klein { padding: 2px 8px; font-size: 13px; }
+.unterueberschrift { display: flex; justify-content: space-between; align-items: center; margin: 12px 0 6px; }
+.auswahlliste { max-height: 180px; overflow-y: auto; border: 1px solid var(--rand); border-radius: 8px; padding: 4px 8px; }
+.auswahlliste label { display: block; padding: 4px 0; cursor: pointer; }
+.auswahlliste label span { color: var(--text-leise); font-size: 13px; }
+.gruendlichkeit label { display: block; margin: 6px 0; }
+
+.fortschritt { height: 10px; background: var(--hintergrund); border-radius: 5px; overflow: hidden; margin-top: 12px; }
+#fortschritt-balken { height: 100%; width: 0%; background: var(--blau); transition: width 0.4s; }
+
+.lernkurve-kopf { display: flex; justify-content: space-between; align-items: center; margin-top: 12px; gap: 12px; flex-wrap: wrap; }
+.legende { display: flex; gap: 14px; flex-wrap: wrap; font-size: 13px; color: var(--text-leise); }
+.legende .farbe { display: inline-block; width: 14px; height: 3px; border-radius: 2px; vertical-align: middle; margin-right: 5px; }
+
+/* Das Diagramm hat seine eigene, dunklere Fläche (auf der die Linienfarben geprüft sind) */
+.lernkurve { position: relative; height: 220px; margin-top: 6px; background: #1a1a19; border-radius: 8px; }
+.lernkurve svg { width: 100%; height: 100%; display: block; }
+.lernkurve .tooltip {
+  position: absolute; pointer-events: none; background: #2d323b; border: 1px solid var(--rand);
+  border-radius: 6px; padding: 6px 8px; font-size: 12px; white-space: nowrap;
+}
+
+.modell-werte { display: grid; grid-template-columns: auto 1fr; gap: 2px 10px; font-size: 13px; margin-top: 4px; }
+.modell-werte dt { color: var(--text-leise); }
+.modell-werte dd { margin: 0; }
+
+label.regler {
+  display: grid;
+  grid-template-columns: 130px 1fr 60px;
+  align-items: center;
+  gap: 10px;
+  margin: 10px 0;
+}
+label.regler output { text-align: right; font-variant-numeric: tabular-nums; }
+input[type="range"] { width: 100%; }

@@ -1,2 +1,4 @@
 __pycache__/
 *.pyc
+end2end/.venv/
+end2end/daten/

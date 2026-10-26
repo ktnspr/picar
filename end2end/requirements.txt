@@ -1,0 +1,13 @@
+# Python-Pakete für das End-to-End-Projekt (Installation: ./einrichten.sh)
+#
+# PyTorch wird von einrichten.sh separat in der CPU-Variante installiert:
+#   pip install torch --index-url https://download.pytorch.org/whl/cpu
+#
+# Diese Pakete kommen zusätzlich in die Umgebung (.venv):
+numpy==2.2.*               # eigene Version, verträgt sich mit PyTorch (siehe einrichten.sh)
+opencv-python-headless     # dito
+evdev                      # Nintendo-Controller auslesen
+flask>=3.0                 # Webserver
+#
+# Vom System mitbenutzt (über die SunFounder-Installation bzw. apt):
+#   picamera2, picarx, robot_hat

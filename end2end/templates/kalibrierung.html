@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Kalibrierung – PiCar-X</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='stil.css') }}">
+</head>
+<body>
+  {% with seite = 'kalibrierung' %}{% include 'kopfzeile.html' %}{% endwith %}
+
+  <main>
+    <img id="livebild" src="/video" alt="Livebild der Kamera">
+
+    <div>
+      <div class="karte">
+        <h2>Servos kalibrieren</h2>
+        <p class="hinweis">
+          Hier legst du fest, wo „geradeaus“ liegt. Verschiebe die Regler, bis die Vorderräder
+          gerade stehen und die Kamera genau nach vorne schaut. Das Livebild hilft dabei:
+          Die Mitte des Bildes sollte genau vor dem Auto liegen.
+        </p>
+        <label class="regler">Lenkung
+          <input id="lenkung" type="range" min="-20" max="20" step="1" value="0">
+          <output id="lenkung-wert">0°</output>
+        </label>
+        <label class="regler">Kamera schwenken
+          <input id="schwenken" type="range" min="-20" max="20" step="1" value="0">
+          <output id="schwenken-wert">0°</output>
+        </label>
+        <label class="regler">Kamera neigen
+          <input id="neigen" type="range" min="-20" max="20" step="1" value="0">
+          <output id="neigen-wert">0°</output>
+        </label>
+        <p class="hinweis">
+          Positive Werte: Lenkung nach rechts, Kamera nach rechts bzw. nach oben.
+        </p>
+        <button id="speichern" class="wichtig">Speichern</button>
+        <button id="zuruecksetzen">Gespeicherte Werte laden</button>
+        <p id="meldung" class="hinweis"></p>
+      </div>
+
+      <div class="karte hinweis">
+        Gespeichert wird über die Kalibrierfunktionen der picarx-Bibliothek in
+        <code>/opt/picar-x/picar-x.conf</code>. Die Werte gelten damit für alle Programme
+        auf diesem Pi – auch für die Fernsteuerungen und die SunFounder-Beispiele.
+        Während der Kalibrierung sind die Motoren aus.
+      </div>
+    </div>
+  </main>
+
+  <script src="{{ url_for('static', filename='gemeinsam.js') }}"></script>
+  <script src="{{ url_for('static', filename='kalibrierung.js') }}"></script>
+</body>
+</html>

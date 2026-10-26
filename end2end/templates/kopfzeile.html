@@ -1,0 +1,13 @@
+<!-- Die Kopfzeile, die auf jeder Seite gleich ist -->
+<header>
+  <h1>PiCar-X End-to-End</h1>
+  <nav>
+    <a href="/" class="{{ 'aktiv' if seite == 'fahren' }}">Fahren &amp; Lernen</a>
+    <a href="/kalibrierung" class="{{ 'aktiv' if seite == 'kalibrierung' }}">Kalibrierung</a>
+  </nav>
+  <span class="abstand"></span>
+  <span id="verbindung"></span>
+  <span id="temperatur" title="CPU-Temperatur: grün unter 70 °C, gelb 70–80 °C, rot ab 80 °C (der Pi beginnt zu drosseln)">CPU –</span>
+  <span id="akku">Akku –</span>
+  <button id="motorschalter">Motoren: AUS</button>
+</header>

@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Fahren &amp; Lernen – PiCar-X</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='stil.css') }}">
+</head>
+<body>
+  {% with seite = 'fahren' %}{% include 'kopfzeile.html' %}{% endwith %}
+
+  <main>
+    <img id="livebild" src="/video" alt="Livebild der Kamera">
+
+    <div>
+      <div class="reiter">
+        <button data-modus="aufnahme">1 · Daten aufnehmen</button>
+        <button data-modus="training">2 · Trainieren</button>
+        <button data-modus="autonom">3 · Autonom fahren</button>
+      </div>
+
+      <section id="modus-aufnahme">
+        <div class="karte">
+          <h2>Daten aufnehmen</h2>
+          <div class="statuszeile">
+            <span id="controller-status">Controller: –</span>
+            <span id="aufnahme-status">Aufnahme: aus</span>
+          </div>
+          <div class="knopfzeile">
+            <button id="aufnahme-knopf" class="wichtig">● Aufnahme starten</button>
+            <button id="pause-knopf">Pause</button>
+          </div>
+          <label class="regler">Geschwindigkeit
+            <input id="tempo-aufnahme" class="tempo-regler" type="range" min="0" max="100" step="5" value="100">
+            <output class="tempo-wert">100 %</output>
+          </label>
+          <label class="regler">Kamera schwenken
+            <input id="schwenken" type="range" min="-30" max="30" step="1" value="0">
+            <output id="schwenken-wert">0°</output>
+          </label>
+          <label class="regler">Kamera neigen
+            <input id="neigen" type="range" min="-35" max="20" step="1" value="-20">
+            <output id="neigen-wert">-20°</output>
+          </label>
+          <label class="regler">Bildausschnitt ab
+            <input id="ausschnitt" type="range" min="0" max="75" step="5" value="25">
+            <output id="ausschnitt-wert">25 %</output>
+          </label>
+          <div class="netzbild">
+            <span class="hinweis">So sieht das Netz das Bild (48 × 160 Pixel):</span>
+            <img id="netzbild" alt="Bildausschnitt für das Netz">
+          </div>
+          <p class="hinweis">
+            Controller: <b>Stick</b> lenken · <b>A</b> anfahren/anhalten · <b>B</b> anhalten ·
+            <b>+</b> Aufnahme starten/stoppen · <b>−</b> Pause (zum Umsetzen).<br>
+            Bilder werden nur gespeichert, während das Auto fährt. Während einer Aufnahme
+            bleiben Kamerawinkel und Bildausschnitt fest. Der blaue Rahmen im Livebild
+            zeigt, welchen Teil des Bildes das Netz sieht.
+          </p>
+        </div>
+
+        <div class="karte">
+          <h2>Gespeicherte Fahrten</h2>
+          <div id="fahrten-liste" class="hinweis">Noch keine Fahrten.</div>
+        </div>
+      </section>
+      <section id="modus-training" class="versteckt">
+        <div class="karte">
+          <h2>Trainieren</h2>
+          <p class="hinweis">Während des Trainings sind die Motoren gesperrt.</p>
+          <div class="unterueberschrift">
+            <b>Trainingsdaten</b>
+            <span><button id="alle-fahrten" class="klein">alle</button>
+                  <button id="keine-fahrten" class="klein">keine</button></span>
+          </div>
+          <div id="fahrten-auswahl" class="auswahlliste hinweis">Noch keine Fahrten.</div>
+          <p id="auswahl-summe" class="hinweis"></p>
+
+          <div class="gruendlichkeit">
+            <label><input type="radio" name="gruendlich" value="nein" checked>
+              <b>schnell</b> – prüft an 20 % der Daten, danach finales Modell auf allen Daten.</label>
+            <label><input type="radio" name="gruendlich" value="ja">
+              <b>gründlich</b> – prüft 4-mal an je einem anderen Viertel (Kreuzvalidierung). Dauert etwa 3-mal so lang.</label>
+          </div>
+          <p class="hinweis">
+            Das Training läuft, bis es 5 Epochen lang nicht mehr besser wird. Mit <b>Beenden</b>
+            hörst du früher auf – das bisher beste Modell wird gespeichert. <b>Abbrechen</b> verwirft alles.
+          </p>
+          <div class="knopfzeile">
+            <button id="training-start" class="wichtig">Training starten</button>
+            <button id="training-beenden" disabled>Beenden &amp; speichern</button>
+            <button id="training-abbrechen" class="gefahr" disabled>Abbrechen</button>
+          </div>
+
+          <div class="fortschritt"><div id="fortschritt-balken"></div></div>
+          <p id="training-text" class="hinweis"></p>
+
+          <div class="lernkurve-kopf">
+            <b id="lernkurve-titel">Lernkurve</b>
+            <span id="lernkurve-legende" class="legende"></span>
+          </div>
+          <div id="lernkurve" class="lernkurve"></div>
+          <p class="hinweis">
+            Mittlerer Fehler in Grad pro Epoche (eine Epoche = alle Lernbilder einmal gesehen).
+            <b>Prüfen</b> zeigt, wie gut das Netz Bilder vorhersagt, die es beim Lernen nie gesehen hat –
+            das ist die ehrliche Note. Beim <b>Lernen</b> ist der Fehler etwas höher, weil die Bilder dort
+            absichtlich erschwert werden (gespiegelt, heller/dunkler, Dropout).
+          </p>
+        </div>
+
+        <div class="karte">
+          <h2>Modelle</h2>
+          <div id="modelle-liste" class="hinweis">Noch keine Modelle.</div>
+        </div>
+      </section>
+      <section id="modus-autonom" class="versteckt">
+        <div class="karte">
+          <h2>Autonom fahren</h2>
+          <label class="regler" style="grid-template-columns: 130px 1fr">Modell
+            <select id="modell-auswahl"><option value="">– bitte wählen –</option></select>
+          </label>
+          <p id="modell-info" class="hinweis"></p>
+
+          <label class="regler">Geschwindigkeit
+            <input id="tempo-autonom" class="tempo-regler" type="range" min="0" max="100" step="5" value="100">
+            <output class="tempo-wert">100 %</output>
+          </label>
+
+          <button id="autonom-knopf" class="gross wichtig" disabled>▶ Autonom fahren</button>
+
+          <dl class="modell-werte autonom-werte">
+            <dt>Lenkwinkel des Netzes</dt><dd id="autonom-lenkwinkel">–</dd>
+            <dt>Rechenzeit pro Bild</dt><dd id="autonom-rechenzeit">–</dd>
+            <dt>Lenkentscheidungen</dt><dd id="autonom-rate">–</dd>
+          </dl>
+          <p class="hinweis">
+            Das Netz lenkt schon im Stand – so kannst du die Vorhersage gefahrlos ausprobieren
+            (Auto über die Linie halten und auf Räder und Livebild achten).
+            Losfahren geht nur bei eingeschalteten Motoren. Gehen die Motoren aus, endet die Fahrt
+            und startet nicht von selbst wieder.
+            Controller (falls verbunden): <b>A</b> Start/Stopp, <b>B</b> Notstopp.
+          </p>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <script src="{{ url_for('static', filename='gemeinsam.js') }}"></script>
+  <script src="{{ url_for('static', filename='lernkurve.js') }}"></script>
+  <script src="{{ url_for('static', filename='fahren.js') }}"></script>
+  <script src="{{ url_for('static', filename='training.js') }}"></script>
+  <script src="{{ url_for('static', filename='autonom.js') }}"></script>
+</body>
+</html>
