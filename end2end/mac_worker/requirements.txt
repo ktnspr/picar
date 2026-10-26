@@ -1,0 +1,7 @@
+# Python-Pakete für den Trainings-Dienst auf dem Mac (Installation macht ./start.sh)
+torch                      # auf Apple Silicon mit MPS (Grafikeinheit)
+numpy
+opencv-python-headless     # JPEG lesen und Bilder verkleinern (wie auf dem Pi)
+fastapi                    # der HTTP-Dienst
+uvicorn                    # Webserver für FastAPI
+zeroconf                   # Ankündigung im lokalen Netz (mDNS)

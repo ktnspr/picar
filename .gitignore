@@ -2,3 +2,10 @@ __pycache__/
 *.pyc
 end2end/.venv/
 end2end/daten/
+.DS_Store
+# end2end: Konfigurationen mit Token (Beispiele *.example.json gehören ins Repo)
+end2end/konfiguration.json
+end2end/mac_worker/config.json
+# end2end: Python-Umgebung und Arbeitsdaten des Mac-Dienstes
+end2end/mac_worker/.venv/
+end2end/mac_worker/auftraege/
