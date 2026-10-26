@@ -80,7 +80,7 @@ kameraregler = kamera_regler.Kameraregler(konfiguration.laden()["regler"])
 
 # Zustand des Einmessens der Reglerwerte (siehe regler_einmessen.py)
 einmessung = {"laeuft": False, "fortschritt": 0.0, "text": "", "ergebnisse": [], "beste": None,
-              "fehler": None, "abbrechen": False, "regler": None, "aufzeichnung": []}
+              "fehler": None, "abbrechen": False, "regler": None, "aufzeichnung": [], "profil": "flott"}
 controller = Controller()
 aufnahme = fahrten.Aufnahme()
 training = Trainingssteuerung()
@@ -121,6 +121,7 @@ autonom = {
     "rate": None,             # Lenkentscheidungen pro Sekunde
     "variante": "B",          # A = klassisch, B = CNN mit fester Kamera, C = CNN mit aktiver Kamera
     "hinweise": [],           # Hinweise zum gewählten Modell (z. B. abweichende Kalibrierung)
+    "tempo_modell": None,     # Geschwindigkeit, mit der die Trainingsdaten aufgenommen wurden
 }
 
 
@@ -204,6 +205,7 @@ def zustand_abfragen():
             "rate": autonom["rate"],
             "variante": autonom["variante"] if autonom["meta"] else None,
             "hinweise": autonom["hinweise"] if autonom["meta"] else [],
+            "tempo_modell": autonom["tempo_modell"] if autonom["meta"] else None,
         },
         "aufnahme": {
             "laeuft": aufnahme.laeuft,
@@ -251,6 +253,9 @@ def modus_wechseln():
 
 @app.post("/api/tempo")
 def tempo_setzen():
+    if aufnahme.laeuft:
+        # Die Geschwindigkeit gehört zu den Aufnahme-Einstellungen einer Fahrt
+        return jsonify({"fehler": "Während einer Aufnahme bleibt die Geschwindigkeit fest."}), 409
     zustand["tempo"] = max(0, min(100, int(request.json["tempo"])))
     if fahrzeug.faehrt():
         fahrzeug.fahren(zustand["tempo"])   # wirkt sofort, auch während der Fahrt
@@ -324,8 +329,11 @@ def regler_einmessen_starten():
                                   "und keine Aufnahme läuft."}), 409
     if not (zustand["linie"] and zustand["linie"].sichtbar):
         return jsonify({"fehler": "Die Linie ist nicht im Bild."}), 409
+    profil = request.json.get("profil", "flott")
+    if profil not in regler_einmessen.PROFILE:
+        raise ValueError(f"Unbekanntes Profil: {profil}")
     einmessung.update(laeuft=True, fortschritt=0.0, text="Starte ...", ergebnisse=[], beste=None,
-                      fehler=None, abbrechen=False)
+                      fehler=None, abbrechen=False, profil=profil)
     threading.Thread(target=regler_einmessen_ablauf, daemon=True).start()
     return jsonify(einmessung_status())
 
@@ -338,8 +346,7 @@ def regler_einmessen_abbrechen():
 
 @app.get("/api/regler/einmessen")
 def einmessung_status():
-    return {k: einmessung[k] for k in ("laeuft", "fortschritt", "text", "ergebnisse", "beste", "fehler")} | {
-        "kp_werte": regler_einmessen.KP_WERTE, "kd_werte": regler_einmessen.KD_WERTE}
+    return {k: einmessung[k] for k in ("laeuft", "fortschritt", "text", "ergebnisse", "beste", "fehler", "profil")}
 
 
 def regler_einmessen_ablauf():
@@ -347,6 +354,7 @@ def regler_einmessen_ablauf():
     ausgang = fahrzeug.schwenken
     richtung = kameraregler.einstellungen["richtung"]
     toleranz = max(2.0, kameraregler.einstellungen["totzone"] + 0.5)
+    profil = regler_einmessen.PROFILE[einmessung["profil"]]
     zustand["messung_laeuft"] = True   # die normale Regelung pausiert
     try:
         # 1. Linie in die Bildmitte holen (mit den jetzigen Reglerwerten), Richtung der Linie merken
@@ -359,7 +367,7 @@ def regler_einmessen_ablauf():
         mitte = fahrzeug.schwenken + richtung * zustand["linie"].winkel   # Schwenkwinkel, bei dem die Linie mittig ist
 
         # 2. Alle Kombinationen ausprobieren
-        kombinationen = [(kp, kd) for kp in regler_einmessen.KP_WERTE for kd in regler_einmessen.KD_WERTE]
+        kombinationen = [(kp, kd) for kp in profil["kp_werte"] for kd in profil["kd_werte"]]
         for nummer, (kp, kd) in enumerate(kombinationen):
             bewertungen = []
             for seite in (1, -1):
@@ -371,16 +379,18 @@ def regler_einmessen_ablauf():
                 time.sleep(0.6)                                          # Servo zur Ruhe kommen lassen
                 einmessung["aufzeichnung"] = []
                 einmessung["regler"] = kamera_regler.Kameraregler(kameraregler.einstellungen | {"kp": kp, "kd": kd})
-                time.sleep(regler_einmessen.VERSUCHSDAUER)               # loslassen und zuschauen
+                time.sleep(profil["versuchsdauer"])                      # loslassen und zuschauen
                 einmessung["regler"] = None
-                bewertungen.append(regler_einmessen.bewerten(einmessung["aufzeichnung"], toleranz))
+                bewertungen.append(regler_einmessen.bewerten(einmessung["aufzeichnung"], toleranz,
+                                                             einmessung["profil"]))
                 einmessung["fortschritt"] = (2 * nummer + (1 if seite > 0 else 2)) / (2 * len(kombinationen))
             einmessung["ergebnisse"].append(regler_einmessen.zusammenfassen(kp, kd, *bewertungen))
 
         einmessung["beste"] = min(einmessung["ergebnisse"], key=lambda e: e["note"])
         b = einmessung["beste"]
-        einmessung["text"] = (f"Fertig. Am besten: Kp {b['kp']}, Kd {b['kd']} – Einschwingzeit {b['einschwingzeit']} s, "
-                              f"Überschwingen {b['ueberschwingen']}°, Unruhe {b['unruhe']}°.")
+        einmessung["text"] = (f"Fertig ({einmessung['profil']}). Am besten: Kp {b['kp']}, Kd {b['kd']} – "
+                              f"Einschwingzeit {b['einschwingzeit']} s, Überschwingen {b['ueberschwingen']}°, "
+                              f"Unruhe {b['unruhe']}°, Ruckeln {b['ruckeln']}.")
     except ValueError as fehler:
         einmessung["fehler"] = str(fehler)
         einmessung["text"] = "Einmessen beendet: " + str(fehler)
@@ -636,7 +646,6 @@ def autonom_modell_waehlen():
     autonom.update(faehrt=False, netz=netz, meta=meta, modell_id=request.json["modell"], lenkwinkel=None)
     fahrzeug.anhalten()
     modell_einstellungen_anwenden(meta)
-    zustand["tempo"] = meta["tempo"]
     torch.set_num_threads(2)   # für ein einzelnes Bild reichen 2 Rechenkerne
     return zustand_abfragen()
 
@@ -682,6 +691,9 @@ def modell_einstellungen_anwenden(meta):
     fahrzeug.kamera_ausrichten(zustand["schwenken_fest"] if aufnahme["kamera_modus"] == "fest" else 0.0,
                                float(aufnahme["kamera"]["neigen"]))
     zustand["ausschnitt_oben"] = aufnahme["ausschnitt_oben"]
+    # Geschwindigkeit wie bei der Aufnahme (ältere Modelle: Durchschnitt der Trainingsdaten)
+    autonom["tempo_modell"] = int(aufnahme.get("tempo", meta["tempo"]))
+    zustand["tempo"] = autonom["tempo_modell"]
 
 
 def eigene_einstellungen_wiederherstellen():

@@ -61,13 +61,14 @@ function einmessenAnzeigen(status) {
 function einmessenTabelle(status) {
   if (!status.ergebnisse.length) return "";
   const zahl = (wert, einheit) => (wert === null ? "–" : wert + einheit);
-  let html = "<table class='tabelle'><tr><th>Kp</th><th>Kd</th><th>Einschwingzeit</th><th>Überschwingen</th>" +
-             "<th>Unruhe</th><th>Note</th><th></th></tr>";
+  let html = `<p class="hinweis">Profil: <b>${status.profil}</b></p>` +
+             "<table class='tabelle'><tr><th>Kp</th><th>Kd</th><th>Einschwingzeit</th><th>Überschwingen</th>" +
+             "<th>Unruhe</th><th>Ruckeln</th><th>Note</th><th></th></tr>";
   for (const e of status.ergebnisse) {
     const beste = status.beste && e.kp === status.beste.kp && e.kd === status.beste.kd;
     html += `<tr class="${beste ? "beste" : ""}"><td>${e.kp}</td><td>${e.kd}</td>` +
             `<td>${zahl(e.einschwingzeit, " s")}</td><td>${zahl(e.ueberschwingen, "°")}</td>` +
-            `<td>${zahl(e.unruhe, "°")}</td><td>${e.note.toFixed(2)}${e.verloren ? " ⚠" : ""}</td>` +
+            `<td>${zahl(e.unruhe, "°")}</td><td>${zahl(e.ruckeln, "")}</td><td>${e.note.toFixed(2)}${e.verloren ? " ⚠" : ""}</td>` +
             `<td>${beste ? "<b>beste</b> " : ""}<button class="klein einmessen-uebernehmen" data-kp="${e.kp}" data-kd="${e.kd}">übernehmen</button></td></tr>`;
   }
   return html + "</table><p class='hinweis'>⚠ = Linie zwischendurch verloren.</p>";
@@ -76,7 +77,7 @@ function einmessenTabelle(status) {
 document.addEventListener("click", async (ereignis) => {
   const knopf = ereignis.target;
   if (knopf.classList.contains("einmessen-start")) {
-    const status = await senden("/api/regler/einmessen", {});
+    const status = await senden("/api/regler/einmessen", { profil: knopf.dataset.profil });
     if (status) { einmessenAnzeigen(status); einmessenBeobachten(); }
   } else if (knopf.classList.contains("einmessen-abbrechen")) {
     senden("/api/regler/einmessen/abbrechen", {});

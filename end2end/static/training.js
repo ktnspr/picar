@@ -197,7 +197,7 @@ async function modelleLaden() {
           <dt>Bild fürs Netz</dt><dd>${modell.bildgroesse[0]} × ${modell.bildgroesse[1]} Pixel, Ausschnitt ab ${Math.round(modell.ausschnitt_oben * 100)} %${modell.ausschnitt_einheitlich === false ? " (Fahrten uneinheitlich!)" : ""}</dd>
           <dt>Kamera</dt><dd>${kameraText(modell)}</dd>
           <dt>Kalibrierung</dt><dd>${kalibrierungText(modell)}</dd>
-          <dt>Tempo der Daten</dt><dd>${modell.tempo} %</dd>
+          <dt>Geschwindigkeit</dt><dd>${modell.aufnahme && modell.aufnahme.tempo !== undefined ? modell.aufnahme.tempo : modell.tempo} % – wird beim Fahren übernommen</dd>
           <dt>Netz</dt><dd>${modell.architektur}, ${modell.parameter.toLocaleString("de-DE")} Parameter</dd>
         </dl>
       </div>

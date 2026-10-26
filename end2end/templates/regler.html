@@ -32,13 +32,19 @@
   <h3>Regler einmessen</h3>
   <p class="hinweis">
     Das Auto steht, die Linie ist im Bild. Für 16 Kombinationen aus Kp und Kd wird die Kamera
-    15° neben die Linie gedreht und losgelassen – einmal links, einmal rechts (etwa 1 Minute).
-    Gemessen werden <b>Einschwingzeit</b> (bis die Kamera ruhig auf der Linie ist),
-    <b>Überschwingen</b> (wie weit sie darüber hinausschießt) und <b>Unruhe</b> (wie sehr sie danach
-    noch zappelt). Note = Einschwingzeit + 0,03 × Überschwingen + 0,3 × Unruhe – kleiner ist besser.
+    15° neben die Linie gedreht und losgelassen – einmal links, einmal rechts (etwa 1–1,5 Minuten).
+    Gemessen werden <b>Einschwingzeit</b> (bis die Kamera auf der Linie ist), <b>Überschwingen</b>
+    (wie weit sie darüber hinausschießt), <b>Unruhe</b> (wie sehr sie danach noch zappelt) und
+    <b>Ruckeln</b> (wie abrupt sie beschleunigt und bremst). Kleinere Note = besser.
+  </p>
+  <p class="hinweis">
+    <b>flott</b>: so schnell wie möglich – Note = Einschwingzeit + 0,03 × Überschwingen + 0,3 × Unruhe.<br>
+    <b>ruhig</b>: so ruhig wie möglich, aber in höchstens 0,8 s auf der Linie (sonst Strafpunkte) –
+    Note = 0,2 × Ruckeln + Unruhe + 0,1 × Überschwingen; probiert kleinere Kp/Kd aus.
   </p>
   <div class="knopfzeile">
-    <button class="einmessen-start">Regler einmessen</button>
+    <button class="einmessen-start" data-profil="flott">Einmessen: flott</button>
+    <button class="einmessen-start" data-profil="ruhig">Einmessen: ruhig</button>
     <button class="einmessen-abbrechen gefahr" disabled>Abbrechen</button>
   </div>
   <div class="fortschritt"><div class="einmessen-balken"></div></div>

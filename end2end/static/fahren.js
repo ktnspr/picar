@@ -119,6 +119,7 @@ function aufnahmeAnzeigen(zustand) {
   reglerZustandAnzeigen(zustand);   // steht in regler.js
   neigenRegler.disabled = a.laeuft;
   ausschnittRegler.disabled = a.laeuft;
+  document.getElementById("tempo-aufnahme").disabled = a.laeuft;   // Geschwindigkeit bleibt während der Aufnahme fest
 
   // Wurde die Aufnahme am Controller gestoppt, die Liste neu laden
   if (vorherLief && !a.laeuft) setTimeout(fahrtenLaden, 300);

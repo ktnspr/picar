@@ -10,7 +10,7 @@ Eine Fahrt ist ein Ordner mit:
 Auf dem Pi liegen die Fahrten in daten/fahrten/, auf dem Mac in einem Auftragsordner.
 
 Fahrten passen nur zusammen, wenn sie unter denselben Bedingungen aufgenommen wurden:
-gleiche Kalibrierung, gleiche Kamerastellung, gleicher Bildausschnitt und – bei aktiver
+gleiche Geschwindigkeit, gleiche Kalibrierung, gleiche Kamerastellung, gleicher Bildausschnitt und – bei aktiver
 Kamera – gleiche Regler- und Linienerkennungs-Einstellungen. Sonst würde das Netz Bilder
 lernen, die beim Fahren so nie wieder vorkommen.
 """
@@ -33,6 +33,7 @@ NUR_BEI_VERFAHREN = {"farbe_bgr": ("farbe",), "toleranz": ("farbe",), "helligkei
 # Namen der Aufnahme-Einstellungen für Meldungen
 NAMEN = {
     "kamera_modus": "Kameramodus",
+    "tempo": "Geschwindigkeit",
     "kamera_neigen": "Kamera-Neigung",
     "kamera_schwenken": "Kamera-Schwenkwinkel",
     "ausschnitt_oben": "Bildausschnitt",
@@ -62,6 +63,7 @@ def aufnahme_einstellungen(meta):
     modus = meta.get("kamera_modus", "fest")
     einstellungen = {
         "kamera_modus": modus,
+        "tempo": int(round(meta["tempo"])),          # Prozent; bleibt während einer Aufnahme fest
         "kamera_neigen": float(meta["kamera"]["neigen"]),
         "ausschnitt_oben": float(meta["bild"]["ausschnitt_oben"]),
         "kalibrierung": meta.get("kalibrierung"),

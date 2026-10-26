@@ -356,6 +356,7 @@ class Training:
             # Alles, was beim Fahren genauso eingestellt werden muss wie bei der Aufnahme:
             "aufnahme": {
                 "kamera_modus": erste.get("kamera_modus", "fest"),
+                "tempo": int(round(erste["tempo"])),           # mit dieser Geschwindigkeit wurde gefahren
                 "kamera": erste["kamera"],
                 "ausschnitt_oben": erste["bild"]["ausschnitt_oben"],
                 "kalibrierung": erste.get("kalibrierung"),         # None = unbekannt (ältere Fahrten)

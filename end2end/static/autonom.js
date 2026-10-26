@@ -61,7 +61,13 @@ function autonomAnzeigen(zustand) {
     modellInfoAnzeigen(a.modell_id);
   }
   autonomKnopf.disabled = !a.modell_id;
-  modellHinweiseAnzeigen(a.hinweise);
+  // Weicht die eingestellte Geschwindigkeit vom Trainingstempo ab? Dann deutlich darauf hinweisen.
+  const hinweise = [...(a.hinweise || [])];
+  if (a.tempo_modell !== null && zustand.tempo !== a.tempo_modell) {
+    hinweise.push(`Geschwindigkeit ${zustand.tempo} % weicht vom Tempo der Trainingsdaten (${a.tempo_modell} %) ab – ` +
+                  "das Modell hat nur Fahrten mit seinem Tempo gesehen.");
+  }
+  modellHinweiseAnzeigen(hinweise);
   autonomKnopf.textContent = a.faehrt ? "■ Anhalten" : "▶ Autonom fahren";
   autonomKnopf.className = "gross " + (a.faehrt ? "gefahr" : "wichtig");
 
