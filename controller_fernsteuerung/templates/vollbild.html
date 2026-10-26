@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>PiCar-X Kamera</title>
+  <style>
+    html, body {
+      margin: 0;
+      height: 100%;
+      background: #000;
+      color: #fff;
+      font-family: system-ui, sans-serif;
+      overflow: hidden;
+    }
+
+    /* Das Kamerabild füllt den ganzen Bildschirm, ohne verzerrt zu werden */
+    #video {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+    }
+
+    /* Halbdurchsichtige Anzeige oben links über dem Bild */
+    #anzeige {
+      position: fixed;
+      top: 12px;
+      left: 12px;
+      display: flex;
+      gap: 16px;
+      align-items: center;
+      padding: 6px 12px;
+      border-radius: 8px;
+      background: rgba(0, 0, 0, 0.5);
+      font-size: 16px;
+    }
+
+    .akku-symbol {
+      position: relative;
+      display: inline-block;
+      width: 32px;
+      height: 16px;
+      border: 2px solid #fff;
+      border-radius: 3px;
+      padding: 1px;
+      vertical-align: middle;
+    }
+    .akku-symbol::after {
+      content: "";
+      position: absolute;
+      right: -5px;
+      top: 3px;
+      width: 3px;
+      height: 6px;
+      background: #fff;
+    }
+    #akku-fuellung { height: 100%; width: 0%; background: #888; }
+    .gruen #akku-fuellung { background: #3ecf5e; }
+    .gelb  #akku-fuellung { background: #f5c518; }
+    .rot   #akku-fuellung { background: #e53935; }
+    #akku-spannung { font-size: 11px; color: #bbb; }
+
+    #controller.weg { color: #ff6b66; font-weight: bold; }
+
+    /* Große Warnungen in der Bildmitte */
+    .warnung {
+      position: fixed;
+      left: 50%;
+      transform: translateX(-50%);
+      padding: 10px 24px;
+      border-radius: 10px;
+      background: #e53935;
+      font-size: 22px;
+      font-weight: bold;
+      animation: blinken 1s infinite;
+    }
+    #akku-warnung { bottom: 24px; }
+    #controller-warnung { top: 40%; }
+    .versteckt { display: none; }
+
+    @keyframes blinken { 50% { opacity: 0.4; } }
+
+    /* ---------- Kamera-Kalibrierung ---------- */
+
+    button {
+      font: inherit;
+      color: #fff;
+      background: rgba(60, 64, 72, 0.9);
+      border: 1px solid #777;
+      border-radius: 8px;
+      padding: 4px 10px;
+    }
+
+    #justieren-feld {
+      position: fixed;
+      right: 12px;
+      bottom: 12px;
+      width: 340px;
+      padding: 12px;
+      border-radius: 10px;
+      background: rgba(0, 0, 0, 0.75);
+      font-size: 14px;
+    }
+    #justieren-feld p { margin: 0 0 10px; color: #ccc; }
+
+    /* Die vier Pfeiltasten als Kreuz angeordnet */
+    .pfeile {
+      display: grid;
+      grid-template-columns: repeat(3, 44px);
+      grid-template-rows: repeat(3, 44px);
+      gap: 4px;
+      margin: 6px 0;
+    }
+    .pfeile button { font-size: 20px; padding: 0; }
+    #nach-oben   { grid-column: 2; grid-row: 1; }
+    #nach-links  { grid-column: 1; grid-row: 2; }
+    #nach-rechts { grid-column: 3; grid-row: 2; }
+    #nach-unten  { grid-column: 2; grid-row: 3; }
+    /* Kamera links, Lenkung rechts daneben */
+    .spalten { display: flex; gap: 20px; }
+    .rechte-spalte { display: flex; flex-direction: column; justify-content: space-between; align-items: flex-end; }
+    .lenkung { display: flex; align-items: center; gap: 8px; margin-top: 6px; }
+    .lenkung button { width: 44px; height: 44px; font-size: 18px; padding: 0; }
+  </style>
+</head>
+<body>
+  <img id="video" src="/video" alt="Kamerabild">
+
+  <div id="anzeige">
+    <div id="akku">
+      <span class="akku-symbol"><span id="akku-fuellung" style="display:block"></span></span>
+      <span id="akku-prozent">– %</span>
+      <span id="akku-spannung">– V</span>
+    </div>
+    <div>Tempo: <span id="tempo">–</span></div>
+    <div id="controller">Controller: –</div>
+    <button id="justieren-oeffnen">Justieren</button>
+  </div>
+
+  <!-- Kalibrierung: verschiebt die Mitte von Kamera und Lenkung dauerhaft -->
+  <div id="justieren-feld" class="versteckt">
+    <p>Linken Stick loslassen. Dann mit den Pfeilen einstellen, bis Kamera und
+       Räder genau geradeaus zeigen. Wird sofort dauerhaft gespeichert.</p>
+    <div class="spalten">
+      <div>
+        <b>Kamera</b>
+        <div class="pfeile">
+          <button id="nach-oben">▲</button>
+          <button id="nach-links">◀</button>
+          <button id="nach-rechts">▶</button>
+          <button id="nach-unten">▼</button>
+        </div>
+        Schwenken: <b id="mitte-schwenken">–</b><br>
+        Neigen: <b id="mitte-neigen">–</b>
+      </div>
+      <div class="rechte-spalte">
+        <div>
+          <b>Lenkung</b>
+          <div class="lenkung">
+            <button id="lenkung-links">◀</button>
+            <b id="mitte-lenkung">–</b>
+            <button id="lenkung-rechts">▶</button>
+          </div>
+        </div>
+        <button id="justieren-fertig">Fertig</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="controller-warnung" class="warnung versteckt">Controller nicht verbunden</div>
+  <div id="akku-warnung" class="warnung versteckt">Akku fast leer!</div>
+
+  <script>
+    "use strict";
+
+    // Ein Tipp auf das Bild schaltet den echten Vollbildmodus ein (bzw. wieder aus).
+    document.getElementById("video").addEventListener("click", () => {
+      if (document.fullscreenElement) document.exitFullscreen();
+      else document.documentElement.requestFullscreen?.();
+    });
+
+    // ---------- Kamera-Kalibrierung ----------
+
+    async function senden(pfad, daten) {
+      const antwort = await fetch(pfad, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(daten),
+      });
+      kameraMitteAnzeigen(await antwort.json());
+    }
+
+    function kameraMitteAnzeigen(status) {
+      const mitVorzeichen = (wert) => (wert > 0 ? "+" : "") + wert + "°";
+      document.getElementById("mitte-schwenken").textContent = mitVorzeichen(status.kamera_mitte_schwenken);
+      document.getElementById("mitte-neigen").textContent = mitVorzeichen(status.kamera_mitte_neigen);
+      document.getElementById("mitte-lenkung").textContent = mitVorzeichen(status.lenkung_mitte);
+    }
+
+    // Jeder Tipp auf einen Pfeil verschiebt die Mitte um 1 Grad.
+    function justieren(schwenken, neigen) {
+      senden("/api/kamera_justieren", { schwenken: schwenken, neigen: neigen });
+    }
+    document.getElementById("nach-links").addEventListener("click", () => justieren(-1, 0));
+    document.getElementById("nach-rechts").addEventListener("click", () => justieren(1, 0));
+    document.getElementById("nach-oben").addEventListener("click", () => justieren(0, 1));
+    document.getElementById("nach-unten").addEventListener("click", () => justieren(0, -1));
+
+    document.getElementById("lenkung-links").addEventListener("click",
+      () => senden("/api/lenkung_justieren", { aenderung: -1 }));
+    document.getElementById("lenkung-rechts").addEventListener("click",
+      () => senden("/api/lenkung_justieren", { aenderung: 1 }));
+
+    document.getElementById("justieren-oeffnen").addEventListener("click", () => {
+      // Erst die Kamera auf ihre (bisherige) Mitte stellen – dann sieht man, ob sie gerade schaut.
+      senden("/api/kamera_zentrieren", {});
+      document.getElementById("justieren-feld").classList.remove("versteckt");
+    });
+    document.getElementById("justieren-fertig").addEventListener("click", () => {
+      document.getElementById("justieren-feld").classList.add("versteckt");
+    });
+
+    // Jede Sekunde den Zustand des Autos abfragen und anzeigen
+    async function anzeigeAktualisieren() {
+      let status;
+      try {
+        status = await (await fetch("/api/status")).json();
+      } catch (fehler) {
+        document.getElementById("controller").textContent = "Keine Verbindung zum Auto";
+        return;
+      }
+
+      const akku = status.akku;
+      if (akku.prozent !== null) {
+        let farbe = "gruen";
+        if (akku.prozent < 20) farbe = "rot";
+        else if (akku.prozent <= 50) farbe = "gelb";
+        document.getElementById("akku").className = farbe;
+        document.getElementById("akku-fuellung").style.width = akku.prozent + "%";
+        document.getElementById("akku-prozent").textContent = akku.prozent + " %";
+        document.getElementById("akku-spannung").textContent = akku.spannung.toFixed(2) + " V";
+        document.getElementById("akku-warnung").classList.toggle("versteckt", farbe !== "rot");
+      }
+
+      document.getElementById("tempo").textContent = status.tempo + " %";
+
+      const controller = document.getElementById("controller");
+      controller.textContent = status.controller ? "Controller: verbunden" : "Controller: getrennt";
+      controller.className = status.controller ? "" : "weg";
+      document.getElementById("controller-warnung").classList.toggle("versteckt", status.controller);
+    }
+
+    anzeigeAktualisieren();
+    setInterval(anzeigeAktualisieren, 1000);
+  </script>
+</body>
+</html>

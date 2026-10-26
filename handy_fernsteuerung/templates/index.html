@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <!-- Seite füllt den Handy-Bildschirm aus und lässt sich nicht versehentlich zoomen -->
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+  <title>PiCar-X Fernsteuerung</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+
+  <!-- Großer Warnhinweis, wenn die Verbindung zum Auto weg ist (normalerweise versteckt) -->
+  <div id="verbindung-weg" class="versteckt">
+    Keine Verbindung zum Auto!<br>
+    <small>Die Motoren wurden automatisch gestoppt.</small>
+  </div>
+
+  <!-- Wird nur angezeigt, wenn das Handy hochkant gehalten wird -->
+  <div id="hochformat-hinweis">Bitte das Handy quer halten ↻</div>
+
+  <header>
+    <div id="verbindung"><span class="punkt"></span> <span id="verbindung-text">Verbinde …</span></div>
+    <div id="akku">
+      <div id="akku-warnung" class="versteckt">Akku fast leer!</div>
+      <div class="akku-symbol"><div id="akku-fuellung"></div></div>
+      <div>
+        <div id="akku-prozent">– %</div>
+        <div id="akku-spannung">– V</div>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <!-- Linke Spalte: Lenkung und Tempo -->
+    <section class="links">
+      <div>
+        <label>
+          Lenkung
+          <input id="lenkung" type="range" step="1" value="0"
+                 min="{{ auto.LENKUNG_MIN }}" max="{{ auto.LENKUNG_MAX }}">
+        </label>
+        <!-- Feinjustierung: falls das Auto bei Lenkung „Mitte“ nicht geradeaus fährt -->
+        <div class="justierung">
+          Mitte
+          <button id="justieren-links" class="klein">◀</button>
+          <span id="lenkung-mitte">0°</span>
+          <button id="justieren-rechts" class="klein">▶</button>
+        </div>
+      </div>
+      <label>
+        <span>Tempo: <span id="tempo-anzeige">30 %</span></span>
+        <input id="tempo" type="range" min="0" max="100" step="5" value="30">
+      </label>
+    </section>
+
+    <!-- Mitte: Kamerabild und Kamera-Steuerung -->
+    <section class="mitte">
+      <img id="video" src="/video" alt="Kamerabild">
+      <div class="kamera-regler">
+        <label>
+          Kamera schwenken
+          <input id="schwenken" type="range" step="1" value="0"
+                 min="{{ auto.SCHWENKEN_MIN }}" max="{{ auto.SCHWENKEN_MAX }}">
+        </label>
+        <label>
+          Kamera neigen
+          <input id="neigen" type="range" step="1" value="0"
+                 min="{{ auto.NEIGEN_MIN }}" max="{{ auto.NEIGEN_MAX }}">
+        </label>
+        <div class="kamera-knoepfe">
+          <button id="kamera-zentrieren">Zentrieren</button>
+          <button id="kamera-justieren">Justieren</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- Rechte Spalte: Fahrknöpfe -->
+    <section class="rechts">
+      <button id="vor" class="fahrknopf">▲ Vorwärts</button>
+      <button id="stopp" class="fahrknopf">STOP</button>
+      <button id="zurueck" class="fahrknopf">▼ Rückwärts</button>
+    </section>
+  </main>
+
+  <!-- Kamera-Kalibrierung: verschiebt die Mitte der Kamera dauerhaft (normalerweise versteckt) -->
+  <div id="justieren-feld" class="versteckt">
+    <p>Die Kamera steht jetzt auf ihrer Mitte. Mit den Pfeilen so einstellen,
+       dass sie genau geradeaus schaut. Wird sofort dauerhaft gespeichert.</p>
+    <div class="pfeile">
+      <button id="kamera-hoch">▲</button>
+      <button id="kamera-links">◀</button>
+      <button id="kamera-rechts">▶</button>
+      <button id="kamera-runter">▼</button>
+    </div>
+    <div class="justieren-zeile">
+      <span>Schwenken: <b id="kamera-mitte-schwenken">–</b><br>Neigen: <b id="kamera-mitte-neigen">–</b></span>
+      <button id="justieren-fertig">Fertig</button>
+    </div>
+  </div>
+
+  <script src="{{ url_for('static', filename='steuerung.js') }}"></script>
+</body>
+</html>

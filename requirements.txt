@@ -1,0 +1,6 @@
+# Python-Pakete für die Fernsteuerung.
+# Flask ist auf dem Pi schon vorhanden (wird von vilib mitinstalliert).
+flask>=3.0
+
+# Nicht über pip/diese Datei installieren, sondern mit den SunFounder-Installern
+# (siehe README.md): robot-hat, vilib, picar-x – sowie picamera2 und opencv (kommen per apt mit vilib).
