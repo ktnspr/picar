@@ -82,6 +82,12 @@
             <label><input type="radio" name="gruendlich" value="ja">
               <b>gründlich</b> – prüft 4-mal an je einem anderen Viertel (Kreuzvalidierung). Dauert etwa 3-mal so lang.</label>
           </div>
+          <div class="gruendlichkeit">
+            <b>Wo trainieren?</b>
+            <label><input type="radio" name="ort" value="pi" checked> auf dem <b>Pi</b></label>
+            <label><input type="radio" name="ort" value="extern" id="ort-extern" disabled>
+              <b>extern</b> <span id="ort-extern-name" class="hinweis">(nicht eingerichtet – siehe unten)</span></label>
+          </div>
           <p class="hinweis">
             Das Training läuft, bis es 5 Epochen lang nicht mehr besser wird. Mit <b>Beenden</b>
             hörst du früher auf – das bisher beste Modell wird gespeichert. <b>Abbrechen</b> verwirft alles.
@@ -92,6 +98,7 @@
             <button id="training-abbrechen" class="gefahr" disabled>Abbrechen</button>
           </div>
 
+          <p id="training-hinweis" class="warnhinweis versteckt"></p>
           <div class="fortschritt"><div id="fortschritt-balken"></div></div>
           <p id="training-text" class="hinweis"></p>
 
@@ -111,6 +118,29 @@
         <div class="karte">
           <h2>Modelle</h2>
           <div id="modelle-liste" class="hinweis">Noch keine Modelle.</div>
+        </div>
+
+        <div class="karte">
+          <h2>Externe Trainingsressource</h2>
+          <p class="hinweis">
+            Ein schnellerer Rechner im selben Netz (z. B. ein Mac) kann das Training übernehmen.
+            Dort muss der Dienst aus <code>end2end/mac_worker</code> laufen (siehe dessen README).
+            Der Pi spricht nur mit diesem Dienst.
+          </p>
+          <label><input type="checkbox" id="extern-aktiv"> Externe Trainingsressource verwenden</label>
+          <div class="formular">
+            <label>Name <input id="extern-name" type="text" placeholder="wird beim Test ausgefüllt"></label>
+            <label>Hostname oder IP <input id="extern-host" type="text" placeholder="z. B. 192.168.1.50 oder macbook.local"></label>
+            <label>Port <input id="extern-port" type="number" min="1" max="65535" value="8765"></label>
+            <label>Token <input id="extern-token" type="password" autocomplete="off" placeholder="aus mac_worker/config.json"></label>
+          </div>
+          <div class="knopfzeile">
+            <button id="extern-suchen">Im Netz suchen</button>
+            <button id="extern-testen">Verbindung testen</button>
+            <button id="extern-speichern" class="wichtig">Speichern</button>
+          </div>
+          <div id="extern-gefunden"></div>
+          <p id="extern-ergebnis" class="hinweis"></p>
         </div>
       </section>
       <section id="modus-autonom" class="versteckt">
@@ -149,6 +179,7 @@
   <script src="{{ url_for('static', filename='lernkurve.js') }}"></script>
   <script src="{{ url_for('static', filename='fahren.js') }}"></script>
   <script src="{{ url_for('static', filename='training.js') }}"></script>
+  <script src="{{ url_for('static', filename='extern.js') }}"></script>
   <script src="{{ url_for('static', filename='autonom.js') }}"></script>
 </body>
 </html>

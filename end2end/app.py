@@ -19,12 +19,15 @@ import cv2
 import torch
 from flask import Flask, Response, jsonify, render_template, request, send_file
 
+import extern
 import fahrten
+import konfiguration
 import modelle
 from controller import Controller
 from einstellungen import AUSSCHNITT_OBEN, KAMERA_NEIGEN_STANDARD, LENKUNG_MAX, PORT, TEMPO_STANDARD
 from kamera import Kamera, overlay_zeichnen
 from kern.netz import lenkwinkel_vorhersagen
+from kern.version import code_version
 from kern.vorverarbeitung import netz_ausschnitt
 
 # Kommt so lange keine Anfrage der Weboberfläche, werden die Motoren ausgeschaltet
@@ -306,8 +309,64 @@ def training_starten():
         return jsonify({"fehler": "Bitte zuerst in den Modus „Trainieren“ wechseln."}), 409
     if fahrzeug.faehrt():
         return jsonify({"fehler": "Trainieren geht nur, wenn das Fahrzeug steht."}), 409
-    training.starten(request.json["fahrten"], bool(request.json["gruendlich"]))
+    training.starten(request.json["fahrten"], bool(request.json["gruendlich"]), request.json.get("ort", "pi"))
     return jsonify(training.status())
+
+
+# ----------------------------------------------------------------------
+# Externe Trainingsressource (z. B. ein Mac mit dem Dienst aus mac_worker/)
+# ----------------------------------------------------------------------
+
+def extern_fuer_browser(einstellung):
+    """Die Einstellung für die Weboberfläche – das Token selbst verraten wir nicht."""
+    return {k: v for k, v in einstellung.items() if k != "token"} | {"token_gesetzt": bool(einstellung["token"])}
+
+
+def extern_aus_anfrage(daten):
+    """Einstellung aus der Anfrage; ein leeres Token-Feld heißt: das gespeicherte behalten."""
+    gespeichert = konfiguration.laden()["extern"]
+    return {
+        "aktiv": bool(daten.get("aktiv", gespeichert["aktiv"])),
+        "name": str(daten.get("name", gespeichert["name"])).strip(),
+        "host": str(daten.get("host", gespeichert["host"])).strip(),
+        "port": int(daten.get("port") or gespeichert["port"]),
+        "token": str(daten.get("token") or "").strip() or gespeichert["token"],
+    }
+
+
+@app.get("/api/extern")
+def extern_lesen():
+    return jsonify(extern_fuer_browser(konfiguration.laden()["extern"]) | {"pi_version": code_version()})
+
+
+@app.post("/api/extern")
+def extern_speichern():
+    konfig = konfiguration.laden()
+    konfig["extern"] = extern_aus_anfrage(request.json)
+    konfiguration.speichern(konfig)
+    return jsonify(extern_fuer_browser(konfig["extern"]))
+
+
+@app.post("/api/extern/suchen")
+def extern_suchen():
+    """Sucht 3 Sekunden lang per mDNS nach Trainings-Diensten im Netz."""
+    return jsonify(extern.dienste_suchen(3))
+
+
+@app.post("/api/extern/testen")
+def extern_testen():
+    """Verbindung testen: erreichbar? welches Gerät? passt die Code-Version?"""
+    einstellung = extern_aus_anfrage(request.json)
+    try:
+        info = extern.info_abfragen(einstellung)
+    except extern.Verbindungsfehler as fehler:
+        return jsonify({"erreichbar": False, "meldung": str(fehler)})
+    pi_version = code_version()
+    warnung = None
+    if info["version"] != pi_version:
+        warnung = (f"Andere Code-Version: extern {info['version']}, Pi {pi_version}. "
+                   "Bitte auf beiden Seiten denselben Stand verwenden (git pull).")
+    return jsonify({"erreichbar": True, "info": info, "pi_version": pi_version, "warnung": warnung})
 
 
 @app.post("/api/training/abbrechen")

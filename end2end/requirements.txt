@@ -8,6 +8,8 @@ numpy==2.2.*               # eigene Version, verträgt sich mit PyTorch (siehe e
 opencv-python-headless     # dito
 evdev                      # Nintendo-Controller auslesen
 flask>=3.0                 # Webserver
+requests                   # mit der externen Trainingsressource sprechen
+zeroconf                   # externe Trainingsressource im Netz finden (mDNS)
 #
 # Vom System mitbenutzt (über die SunFounder-Installation bzw. apt):
 #   picamera2, picarx, robot_hat

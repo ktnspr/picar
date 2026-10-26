@@ -62,7 +62,8 @@ Fahrten lassen sich umbenennen und löschen.
 **2. Trainieren:** Fahrten auswählen, „schnell“ oder „gründlich“, Training starten.
 Es läuft, bis das Netz 5 Epochen lang nicht besser wird; „Beenden & speichern“ hört früher auf.
 Die Lernkurve zeigt den Fehler beim Lernen und beim Prüfen. Mit etwa 4000 Bildern dauert
-„schnell“ rund 6 Minuten, „gründlich“ rund 15.
+„schnell“ rund 6 Minuten, „gründlich“ rund 15. Unter „Wo trainieren?“ lässt sich statt des Pi
+eine externe Trainingsressource wählen (siehe unten).
 
 **3. Autonom fahren:** Modell wählen – Kamerawinkel, Bildausschnitt und Geschwindigkeit
 werden wie in den Trainingsdaten eingestellt. Das Netz lenkt schon im Stand (zum Ausprobieren).
@@ -79,20 +80,54 @@ Motoren ein, „Autonom fahren“. Controller: A = Start/Stopp, B = Notstopp.
 
 Beim Training wird der Pi über 80 °C heiß und drosselt etwas – ein Lüfter hilft.
 
+## Externe Trainingsressource (z. B. ein Mac)
+
+Ein schnellerer Rechner im selben Netz kann das Training übernehmen. Dort läuft der Dienst
+aus [`mac_worker/`](mac_worker/README.md); er benutzt denselben Trainings-Code (Paket `kern`)
+wie der Pi, die Modelle passen also garantiert zusammen.
+
+Auf dem Pi: **2 · Trainieren → Externe Trainingsressource**
+
+1. „Im Netz suchen“ (der Dienst kündigt sich per mDNS an) oder Hostname/IP und Port eintragen
+2. Token aus `mac_worker/config.json` des Macs eintragen
+3. „Verbindung testen“ – zeigt Erreichbarkeit, Rechengerät (MPS/CPU) und Code-Version;
+   warnt, wenn die Version von der auf dem Pi abweicht
+4. „Externe Trainingsressource verwenden“ ankreuzen, „Speichern“
+
+Die Einstellung steht in `konfiguration.json` (mit Token, deshalb nicht im Git-Repository;
+Vorlage: `konfiguration.example.json`). Beim Training dann „Wo trainieren? → extern“ wählen.
+Ist der Rechner nicht erreichbar, trainiert der Pi selbst und sagt das deutlich. Der Steckbrief
+jedes Modells hält fest, wo, auf welchem Gerät und wie lange trainiert wurde.
+
 ## Aufbau des Codes
+
+**Gemeinsamer Kern** – Paket `kern/`, benutzt vom Pi UND vom Mac-Dienst (ohne Pi-spezifische Module):
+
+| Datei | Aufgabe |
+|---|---|
+| `kern/netz.py` | Das neuronale Netz (PilotNet, verkleinert) |
+| `kern/vorverarbeitung.py` | Ausschnitt aus dem Kamerabild → Bild fürs Netz |
+| `kern/datensatz.py` | Fahrten von der Festplatte lesen, Blöcke bilden |
+| `kern/training.py` | Training: Augmentierung, Ausgleich, Early Stopping, blockweise Validierung |
+| `kern/konstanten.py`, `kern/version.py` | Netzgröße, Lenkbereich; Code-Version (Git-Commit) |
+
+**Pi:**
 
 | Datei | Aufgabe |
 |---|---|
 | `app.py` | Webserver und Steuerzentrale: Modi, Steuerschleife (30-mal pro Sekunde), Sicherheit |
 | `einstellungen.py` | Alle wichtigen Zahlen an einer Stelle (Bildgrößen, Raten, Ordner) |
 | `fahrzeug.py` | Motoren (mit elektronischem Differential), Lenkung, Kamera-Servos, Kalibrierung |
-| `kamera.py` | Kamerabilder holen, Ausschnitt fürs Netz, Overlay im Livebild |
+| `kamera.py` | Kamerabilder holen, Overlay im Livebild |
 | `controller.py` | Nintendo-Controller mit evdev auslesen (zum Testen direkt startbar) |
 | `fahrten.py` | Fahrten aufnehmen, speichern, umbenennen, löschen |
-| `netz.py` | Das neuronale Netz (PilotNet, verkleinert) |
-| `training.py` | Training: Daten laden, Blöcke, Augmentierung, Early Stopping, Validierung |
+| `trainingssteuerung.py` | Training starten (Pi oder extern, mit Rückfall) und Modell speichern |
+| `extern.py` | Mit der externen Trainingsressource sprechen (Suche, Test, Training) |
+| `konfiguration.py` | Gespeicherte Einstellungen (`konfiguration.json`) |
 | `modelle.py` | Modelle speichern, laden, umbenennen, löschen |
 | `templates/`, `static/` | Die Weboberfläche (HTML, CSS, JavaScript) |
+
+**Mac:** `mac_worker/` – der Trainings-Dienst (eigene [README](mac_worker/README.md)).
 
 Daten liegen in `daten/` (nicht im Git-Repository):
 

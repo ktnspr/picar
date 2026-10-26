@@ -66,7 +66,8 @@ document.getElementById("keine-fahrten").addEventListener("click", () => {
 
 document.getElementById("training-start").addEventListener("click", async () => {
   const gruendlich = document.querySelector("input[name=gruendlich]:checked").value === "ja";
-  const status = await senden("/api/training/start", { fahrten: gewaehlteFahrten(), gruendlich: gruendlich });
+  const ort = document.querySelector("input[name=ort]:checked").value;   // "pi" oder "extern"
+  const status = await senden("/api/training/start", { fahrten: gewaehlteFahrten(), gruendlich: gruendlich, ort: ort });
   if (status) trainingAnzeigen(status);
 });
 document.getElementById("training-beenden").addEventListener("click", () => senden("/api/training/beenden", {}));
@@ -79,6 +80,10 @@ let trainingLiefVorher = false;
 function trainingAnzeigen(status) {
   document.getElementById("fortschritt-balken").style.width = (status.fortschritt * 100) + "%";
   document.getElementById("training-text").textContent = status.fehler ? "Fehler: " + status.fehler : status.text;
+  // Deutlicher Hinweis, wenn die externe Ressource nicht erreichbar war und der Pi übernommen hat
+  const hinweis = document.getElementById("training-hinweis");
+  hinweis.textContent = status.hinweis || "";
+  hinweis.classList.toggle("versteckt", !status.hinweis);
   document.getElementById("training-start").disabled = status.laeuft;
   document.getElementById("training-abbrechen").disabled = !status.laeuft;
   document.getElementById("training-beenden").disabled = !status.laeuft;
@@ -99,6 +104,16 @@ setInterval(async () => {
 // ---------------------------------------------------------------------
 // Liste der Modelle
 // ---------------------------------------------------------------------
+
+// Wo, worauf und wie lange wurde trainiert? (Ältere Modelle haben diese Angabe noch nicht.)
+function trainiertAufText(modell) {
+  const t = modell.trainiert_auf;
+  if (!t) return "Pi (CPU)";
+  let text = `${t.ort === "extern" ? t.name : "Pi"} (${t.geraet.toUpperCase()}), ${Math.round(t.dauer_s)} s`;
+  if (t.ort === "extern") text += ` – mit Übertragung ${Math.round(t.gesamtdauer_s)} s, Code-Version ${t.code_version}`;
+  if (t.hinweis) text += ` – ${t.hinweis}`;
+  return text;
+}
 
 async function modelleLaden() {
   const liste = await senden("/api/modelle");
@@ -123,6 +138,7 @@ async function modelleLaden() {
           <dt>Fahrten</dt><dd class="fahrten-namen"></dd>
           <dt>Bilder</dt><dd>${modell.bilder_gesamt} (davon ${v.lern_bilder} Lernen / ${v.pruef_bilder} Prüfen im Probetraining)</dd>
           <dt>Training</dt><dd>${Math.round(modell.trainingsdauer_s)} s, ${modell.epochen} Epochen, Modus ${modell.modus === "gruendlich" ? "gründlich" : "schnell"}</dd>
+          <dt>Trainiert auf</dt><dd>${trainiertAufText(modell)}</dd>
           ${modell.hinweis ? `<dt>Hinweis</dt><dd class="schlecht">${modell.hinweis}</dd>` : ""}
           <dt>Bild fürs Netz</dt><dd>${modell.bildgroesse[0]} × ${modell.bildgroesse[1]} Pixel, Ausschnitt ab ${Math.round(modell.ausschnitt_oben * 100)} %${modell.ausschnitt_einheitlich ? "" : " (Fahrten uneinheitlich!)"}</dd>
           <dt>Kamera</dt><dd>schwenken ${modell.kamera.schwenken}°, neigen ${modell.kamera.neigen}°${modell.kamera_einheitlich ? "" : " (Fahrten uneinheitlich!)"}</dd>

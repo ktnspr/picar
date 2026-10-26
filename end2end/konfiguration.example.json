@@ -1,0 +1,9 @@
+{
+  "extern": {
+    "aktiv": false,
+    "name": "Alexanders Mac",
+    "host": "192.168.1.50",
+    "port": 8765,
+    "token": "das Token aus mac_worker/config.json auf dem Mac"
+  }
+}
