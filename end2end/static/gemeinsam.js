@@ -21,6 +21,21 @@ async function senden(pfad, daten) {
   }
 }
 
+// Akku: Batteriesymbol mit Füllstand, Prozent und (klein) die gemessene Spannung.
+// Farbe: grün über 50 %, gelb 20–50 %, rot unter 20 % – dann blinkt zusätzlich eine Warnung.
+const AKKU_GELB = 50;
+const AKKU_ROT = 20;
+
+function akkuAnzeigen(prozent, volt) {
+  if (prozent === null || prozent === undefined) return;
+  const farbe = prozent < AKKU_ROT ? "rot" : prozent <= AKKU_GELB ? "gelb" : "gruen";
+  document.getElementById("akku").className = farbe;
+  document.getElementById("akku-fuellung").style.width = prozent + "%";
+  document.getElementById("akku-prozent").textContent = prozent + " %";
+  document.getElementById("akku-volt").textContent = volt.toFixed(2) + " V";
+  document.getElementById("akku-warnung").classList.toggle("versteckt", farbe !== "rot");
+}
+
 // Ab diesen Temperaturen (°C) wechselt die Farbe der Anzeige.
 // Der Pi 5 beginnt bei etwa 80 °C, seinen Takt zu senken (zu drosseln).
 const TEMPERATUR_WARM = 70;
@@ -50,8 +65,7 @@ async function zustandAbfragen() {
   letzterZustand = zustand;
   verbindung.textContent = "";
   verbindung.className = "";
-  document.getElementById("akku").textContent =
-    zustand.akku_volt ? `Akku ${zustand.akku_volt.toFixed(2)} V` : "Akku –";
+  akkuAnzeigen(zustand.akku_prozent, zustand.akku_volt);
   temperaturAnzeigen(zustand.temperatur, zustand.drosselt);
 
   const schalter = document.getElementById("motorschalter");

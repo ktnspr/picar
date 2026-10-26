@@ -8,6 +8,11 @@
   <span class="abstand"></span>
   <span id="verbindung"></span>
   <span id="temperatur" title="CPU-Temperatur: grün unter 70 °C, gelb 70–80 °C, rot ab 80 °C (der Pi beginnt zu drosseln)">CPU –</span>
-  <span id="akku">Akku –</span>
+  <span id="akku" title="Ladestand, geschätzt aus der Akkuspannung: grün über 50 %, gelb 20–50 %, rot unter 20 %">
+    <span class="akku-symbol"><span id="akku-fuellung"></span></span>
+    <b id="akku-prozent">– %</b>
+    <small id="akku-volt"></small>
+  </span>
+  <span id="akku-warnung" class="versteckt">Akku fast leer!</span>
   <button id="motorschalter">Motoren: AUS</button>
 </header>

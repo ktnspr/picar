@@ -1,6 +1,7 @@
 /* Aussehen der Weboberfläche (für den Notebook-Bildschirm gedacht) */
 
 :root {
+  --kopfzeile: 66px;   /* Höhe der Kopfzeile – das Livebild bleibt knapp darunter stehen */
   --hintergrund: #15181d;
   --flaeche: #1f232a;
   --rand: #3c4048;
@@ -32,9 +33,14 @@ header {
   display: flex;
   align-items: center;
   gap: 20px;
-  padding: 10px 20px;
+  height: var(--kopfzeile);
+  padding: 0 20px;
   background: var(--flaeche);
   border-bottom: 1px solid var(--rand);
+  /* Die Kopfzeile (Akku, Temperatur, Motorschalter) bleibt beim Scrollen oben */
+  position: sticky;
+  top: 0;
+  z-index: 10;
 }
 header h1 { font-size: 18px; margin: 0; }
 header nav a {
@@ -45,6 +51,28 @@ header nav a {
 header nav a.aktiv { color: var(--text); border-bottom: 2px solid var(--blau); }
 .abstand { flex: 1; }
 #verbindung.weg { color: var(--rot-hell); font-weight: bold; }
+
+/* Akkuanzeige: Batteriesymbol mit Füllstand */
+#akku { display: inline-flex; align-items: center; gap: 6px; }
+#akku small { color: var(--text-leise); font-size: 12px; }
+.akku-symbol {
+  position: relative; display: inline-block; width: 30px; height: 15px;
+  border: 2px solid var(--text); border-radius: 3px; padding: 1px;
+}
+.akku-symbol::after {   /* der „Knubbel“ rechts */
+  content: ""; position: absolute; right: -5px; top: 3px; width: 3px; height: 5px;
+  background: var(--text); border-radius: 0 1px 1px 0;
+}
+#akku-fuellung { display: block; height: 100%; width: 0%; background: #888; border-radius: 1px; }
+#akku.gruen #akku-fuellung { background: var(--gruen-hell); }
+#akku.gelb  #akku-fuellung { background: var(--gelb); }
+#akku.rot   #akku-fuellung { background: var(--rot-hell); }
+#akku.rot   #akku-prozent  { color: var(--rot-hell); }
+#akku-warnung {
+  background: var(--rot); color: white; font-weight: bold; padding: 3px 10px;
+  border-radius: 6px; animation: blinken 1s infinite;
+}
+@keyframes blinken { 50% { opacity: 0.35; } }
 
 /* Temperaturanzeige: grün – gelb – rot (mit Punkt davor, damit es nicht nur an der Farbe hängt) */
 #temperatur::before { content: "●"; margin-right: 5px; }
@@ -83,6 +111,11 @@ main {
   background: #000;
   border-radius: 10px;
   object-fit: contain;
+  /* Das Livebild bleibt beim Scrollen unter der Kopfzeile stehen – auch wenn rechts lange Listen stehen */
+  position: sticky;
+  top: calc(var(--kopfzeile) + 20px);
+  align-self: start;
+  max-height: calc(100vh - var(--kopfzeile) - 40px);
 }
 
 .karte {

@@ -21,6 +21,7 @@ from flask import Flask, Response, jsonify, render_template, request, send_file
 
 import extern
 import fahrten
+from akku import spannung_zu_prozent
 import konfiguration
 import modelle
 from controller import Controller
@@ -83,6 +84,7 @@ zustand = {
     "tempo": TEMPO_STANDARD,     # eingestellte Geschwindigkeit in Prozent
     "ausschnitt_oben": AUSSCHNITT_OBEN,   # ab welcher Bildhöhe das Netz das Bild sieht (0 bis 1)
     "akku_volt": None,
+    "akku_prozent": None,         # geschätzter Ladestand (aus der Spannung, siehe akku.py)
     "temperatur": None,          # CPU-Temperatur in °C
     "drosselt": False,           # senkt der Pi gerade wegen Hitze seinen Takt?
     "anzeige_lenkwinkel": None,  # Lenkwinkel für das Overlay im Livebild
@@ -157,6 +159,7 @@ def zustand_abfragen():
         "tempo": zustand["tempo"],
         "ausschnitt_oben": zustand["ausschnitt_oben"],
         "akku_volt": zustand["akku_volt"],
+        "akku_prozent": zustand["akku_prozent"],
         "temperatur": zustand["temperatur"],
         "drosselt": zustand["drosselt"],
         "motoren_frei": fahrzeug.motoren_frei,
@@ -594,6 +597,7 @@ def sensoren_messen():
         if 5.0 < spannung < 9.0:   # Ausreißer (Messfehler) ignorieren
             messwerte = (messwerte + [spannung])[-10:]   # gleitender Mittelwert über 10 Messungen
             zustand["akku_volt"] = round(sum(messwerte) / len(messwerte), 2)
+            zustand["akku_prozent"] = round(spannung_zu_prozent(zustand["akku_volt"]))
 
         # Die CPU-Temperatur steht in tausendstel Grad in dieser Datei
         with open("/sys/class/thermal/thermal_zone0/temp") as datei:
