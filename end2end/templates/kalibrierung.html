@@ -92,6 +92,8 @@
         </p>
       </div>
 
+      {% include 'regler.html' %}
+
       <div class="karte hinweis">
         Gespeichert wird über die Kalibrierfunktionen der picarx-Bibliothek in
         <code>/opt/picar-x/picar-x.conf</code>. Die Werte gelten damit für alle Programme
@@ -104,5 +106,6 @@
   <script src="{{ url_for('static', filename='gemeinsam.js') }}"></script>
   <script src="{{ url_for('static', filename='kalibrierung.js') }}"></script>
   <script src="{{ url_for('static', filename='linie.js') }}"></script>
+  <script src="{{ url_for('static', filename='regler.js') }}"></script>
 </body>
 </html>

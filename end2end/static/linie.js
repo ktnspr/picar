@@ -54,6 +54,8 @@ document.getElementById("livebild").addEventListener("click", async (ereignis) =
 const bisherigeAnzeige = zustandAnzeigen;
 zustandAnzeigen = (zustand) => {
   bisherigeAnzeige(zustand);
+  reglerZustandAnzeigen(zustand);   // steht in regler.js
+  document.getElementById("regeltest").checked = zustand.regeltest;
   const l = zustand.linie;
   // Die gemessene Helligkeit hilft beim Einstellen der Mindesthelligkeit
   const hell = l && l.helligkeit !== null ? `, Helligkeit des hellsten Teils im Streifen ${l.helligkeit}` : "";

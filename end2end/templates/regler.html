@@ -1,6 +1,8 @@
-<!-- Einstellungen der Kameraregelung (aktive Kamera) – wird in mehreren Reitern eingebunden -->
-<details class="karte regler-karte">
-  <summary><b>Kameraregelung</b> <span class="hinweis regler-zustand"></span></summary>
+<!-- Einstellungen der Kameraregelung (aktive Kamera) – auf der Kalibrierseite -->
+<div class="karte regler-karte">
+  <h2>Kameraregelung <span class="hinweis regler-zustand"></span></h2>
+  <label><input id="regeltest" type="checkbox"> <b>Kamera folgt der Linie (Test)</b>
+    <span class="hinweis">– zum Ausprobieren der Reglerwerte; die Kamera neigt sich dafür wie bei der Aufnahme</span></label>
   <p class="hinweis">
     PD-Regler: Pro Kamerabild schwenkt die Kamera um <i>Kp</i> × Abweichung, gedämpft durch
     <i>Kd</i> × Änderung der Abweichung. Innerhalb der Totzone bleibt sie ruhig.
@@ -50,4 +52,4 @@
   <div class="fortschritt"><div class="einmessen-balken"></div></div>
   <p class="hinweis einmessen-text"></p>
   <div class="einmessen-tabelle"></div>
-</details>
+</div>

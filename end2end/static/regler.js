@@ -9,6 +9,12 @@ const REGLER_EINHEITEN = {
 const REGLER_ZUSTAENDE = { folgt: "– folgt der Linie", sucht: "– sucht die Linie", verloren: "– Linie verloren" };
 
 function reglerAnzeigen(einstellungen) {
+  // Kurzfassung (Reiter „Daten aufnehmen“)
+  for (const ziel of document.querySelectorAll(".regler-kurz")) {
+    ziel.textContent = `Kp ${einstellungen.kp}, Kd ${einstellungen.kd}, Totzone ${einstellungen.totzone}°, ` +
+      `bis ${einstellungen.max_geschwindigkeit}°/s, Schwenkbereich ±${einstellungen.schwenk_max}°` +
+      (einstellungen.richtung === -1 ? ", Richtung umgekehrt" : "");
+  }
   for (const feld of document.querySelectorAll("[data-regler]")) {
     const name = feld.dataset.regler;
     if (feld.type === "checkbox") {
@@ -98,5 +104,14 @@ async function einmessenBeobachten() {
 senden("/api/regler/einmessen").then((status) => {
   if (status) { einmessenAnzeigen(status); if (status.laeuft) einmessenBeobachten(); }
 });
+
+// Test-Schalter auf der Kalibrierseite: Kamera folgt der Linie
+const regeltest = document.getElementById("regeltest");
+if (regeltest) {
+  regeltest.addEventListener("change", async () => {
+    await senden("/api/regeltest", { an: regeltest.checked });
+    if (!regeltest.checked) gespeicherteWerteLaden();   // Servos wieder auf die Kalibrier-Vorschau (kalibrierung.js)
+  });
+}
 
 senden("/api/regler").then((einstellungen) => einstellungen && reglerAnzeigen(einstellungen));

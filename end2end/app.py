@@ -107,6 +107,7 @@ zustand = {
     "schwenken_fest": 0.0,       # Schwenkwinkel für die feste Kamera (Regler „Kamera schwenken“)
     "regler_zustand": None,      # "folgt", "sucht", "verloren" – oder None, wenn die Regelung aus ist
     "messung_laeuft": False,     # Bildwinkel wird gerade ausgemessen (Regelung pausiert)
+    "regeltest": False,          # Kalibrierseite: Kamera folgt testweise der Linie
 }
 letzte_browser_anfrage = time.monotonic()
 
@@ -195,6 +196,7 @@ def zustand_abfragen():
         "kamera_modus": zustand["kamera_modus"],
         "schwenken_fest": zustand["schwenken_fest"],
         "regler_zustand": zustand["regler_zustand"],
+        "regeltest": zustand["regeltest"],
         "linie": linie_fuer_browser(zustand["linie"]),
         "autonom": {
             "modell_id": autonom["modell_id"],
@@ -233,6 +235,7 @@ def modus_wechseln():
     # Während des Trainings sind die Motoren gesperrt.
     fahrzeug.motoren_sperren(neuer_modus == "training")
     aufnahme.stoppen()    # Eine laufende Aufnahme wird beendet
+    zustand["regeltest"] = False   # der Regeltest gehört zur Kalibrierseite
     autonom["faehrt"] = False   # und das autonome Fahren auch.
     controller.neu_gedrueckte_tasten()   # alte Tastendrücke verwerfen – sie gehören zum alten Modus
     if zustand["modus"] == "autonom" and neuer_modus != "autonom":
@@ -286,7 +289,18 @@ def regelung_aktiv():
         return zustand["kamera_modus"] == "aktiv"
     if zustand["modus"] == "autonom":
         return autonom["variante"] in ("A", "C")
+    if zustand["modus"] == "kalibrierung":
+        return zustand["regeltest"]
     return False
+
+
+@app.post("/api/regeltest")
+def regeltest_schalten():
+    """Kalibrierseite: Kamera folgt testweise der Linie – mit der Neigung wie bei der Aufnahme."""
+    zustand["regeltest"] = bool(request.json["an"]) and zustand["modus"] == "kalibrierung"
+    if zustand["regeltest"]:
+        fahrzeug.kamera_ausrichten(fahrzeug.schwenken, fahrzeug.neigen)
+    return zustand_abfragen()
 
 
 @app.post("/api/kamera_modus")
@@ -324,9 +338,8 @@ def regler_einstellen():
 def regler_einmessen_starten():
     if einmessung["laeuft"]:
         return jsonify({"fehler": "Das Einmessen läuft bereits."}), 409
-    if fahrzeug.faehrt() or aufnahme.laeuft or zustand["modus"] not in ("aufnahme", "autonom"):
-        return jsonify({"fehler": "Einmessen geht im Aufnahme- oder Autonom-Reiter, wenn das Auto steht "
-                                  "und keine Aufnahme läuft."}), 409
+    if fahrzeug.faehrt() or aufnahme.laeuft or zustand["modus"] == "training":
+        return jsonify({"fehler": "Einmessen geht nur, wenn das Auto steht, keine Aufnahme und kein Training läuft."}), 409
     if not (zustand["linie"] and zustand["linie"].sichtbar):
         return jsonify({"fehler": "Die Linie ist nicht im Bild."}), 409
     profil = request.json.get("profil", "flott")
