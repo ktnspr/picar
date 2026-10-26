@@ -15,7 +15,7 @@ async function modellAuswahlLaden() {
   for (const modell of liste) {
     const option = document.createElement("option");
     option.value = modell.id;
-    option.textContent = `${modell.anzeigename} – Fehler ${modell.validierung.fehler_grad.toFixed(1)}°`;
+    option.textContent = `${modell.anzeigename} – Variante ${modell.variante || "B"}, Fehler ${modell.validierung.fehler_grad.toFixed(1)}°`;
     modellAuswahl.appendChild(option);
   }
   modellAuswahl.value = gewaehlt;
@@ -24,10 +24,22 @@ async function modellAuswahlLaden() {
 function modellInfoAnzeigen(modellId) {
   const modell = modellListe.find((m) => m.id === modellId);
   document.getElementById("modell-info").textContent = modell
-    ? `Eingestellt wie in den Trainingsdaten: Kamera schwenken ${modell.kamera.schwenken}°, ` +
-      `neigen ${modell.kamera.neigen}°, Bildausschnitt ab ${Math.round(modell.ausschnitt_oben * 100)} %, ` +
-      `Tempo ${modell.tempo} %. Trainiert mit: ${modell.fahrten.map((f) => f.anzeigename).join(", ")}.`
+    ? `Variante ${varianteText(modell)}. Eingestellt wie bei der Aufnahme der Trainingsdaten – Kamera: ` +
+      `${kameraText(modell)}; Bildausschnitt ab ${Math.round(modell.ausschnitt_oben * 100)} %; ` +
+      `Kalibrierung: ${kalibrierungText(modell)}; Tempo ${modell.tempo} %. ` +
+      `Trainiert mit: ${modell.fahrten.map((f) => f.anzeigename).join(", ")}.`
     : "";
+}
+
+function modellHinweiseAnzeigen(hinweise) {
+  const ziel = document.getElementById("modell-hinweise");
+  ziel.innerHTML = "";
+  for (const hinweis of hinweise || []) {
+    const zeile = document.createElement("div");
+    zeile.textContent = hinweis;
+    ziel.appendChild(zeile);
+  }
+  ziel.classList.toggle("versteckt", !hinweise || hinweise.length === 0);
 }
 
 // Ein Modell auswählen = laden und Kamera, Ausschnitt, Tempo einstellen
@@ -49,6 +61,7 @@ function autonomAnzeigen(zustand) {
     modellInfoAnzeigen(a.modell_id);
   }
   autonomKnopf.disabled = !a.modell_id;
+  modellHinweiseAnzeigen(a.hinweise);
   autonomKnopf.textContent = a.faehrt ? "■ Anhalten" : "▶ Autonom fahren";
   autonomKnopf.className = "gross " + (a.faehrt ? "gefahr" : "wichtig");
 

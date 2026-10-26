@@ -15,6 +15,7 @@ import extern
 import fahrten
 import konfiguration
 import modelle
+from kern.datensatz import aufnahme_einstellungen, einheitlichkeit_pruefen
 from kern.training import Training
 from kern.version import code_version
 
@@ -42,6 +43,11 @@ class Trainingssteuerung:
         ordner = [fahrten.fahrt_ordner(fahrt_id) for fahrt_id in fahrt_ids]   # prüft, ob es sie gibt
         if not ordner:
             raise ValueError("Bitte mindestens eine Fahrt auswählen.")
+        metas = [fahrten.meta_lesen(o) for o in ordner]
+        unterschiede = einheitlichkeit_pruefen(metas)
+        if unterschiede:
+            raise ValueError("Die Fahrten passen nicht zusammen: " + " | ".join(unterschiede))
+        variante = "C" if aufnahme_einstellungen(metas[0])["kamera_modus"] == "aktiv" else "B"
         self.ergebnis, self.hinweis, self._startzeit = None, None, time.time()
 
         if ort == "extern":
@@ -50,13 +56,13 @@ class Trainingssteuerung:
                 raise ValueError("Die externe Trainingsressource ist nicht eingeschaltet (siehe unten).")
             externes = extern.ExternesTraining(einstellung, code_version())
             try:
-                externes.starten(ordner, gruendlich, bei_ende=self._speichern)
+                externes.starten(ordner, gruendlich, bei_ende=self._speichern, variante=variante)
                 self.aktiv, self.ort = externes, "extern"
                 return
             except extern.Verbindungsfehler as fehler:
                 # Rückfall: dann eben auf dem Pi
                 name = einstellung["name"] or einstellung["host"]
-                self.hinweis = f"Externe Trainingsressource „{name}“ nicht erreichbar ({fehler}) – trainiere auf dem Pi."
+                self.hinweis = f"Externe Trainingsressource „{name}“ nicht verwendbar ({fehler}) – trainiere auf dem Pi."
 
         self.aktiv, self.ort = Training(geraet="cpu", threads=THREADS), "pi"
         self.aktiv.starten(ordner, gruendlich, bei_ende=self._speichern)

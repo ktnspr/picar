@@ -235,6 +235,24 @@ button.klein { padding: 2px 8px; font-size: 13px; }
 .modell-werte dt { color: var(--text-leise); }
 .modell-werte dd { margin: 0; }
 
+/* Tabelle der Einmess-Ergebnisse */
+.tabelle { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 8px; font-variant-numeric: tabular-nums; }
+.tabelle th { text-align: left; color: var(--text-leise); font-weight: normal; border-bottom: 1px solid var(--rand); padding: 4px; }
+.tabelle td { padding: 3px 4px; border-bottom: 1px solid #2a2e35; }
+.tabelle tr.beste td { background: rgba(62, 207, 94, 0.12); }
+.regler-karte h3 { font-size: 15px; margin: 16px 0 6px; }
+.einmessen-balken { height: 100%; width: 0%; background: var(--blau); transition: width 0.4s; }
+.regler-karte summary { cursor: pointer; }
+
+/* Kennzeichnung fest/aktiv in der Fahrtenauswahl */
+.marke { font-size: 12px; padding: 1px 6px; border-radius: 4px; background: #2d323b; color: var(--text-leise); }
+.marke.aktiv { background: rgba(79, 140, 255, 0.2); color: var(--text); }
+
+.farbfeld {
+  display: inline-block; width: 16px; height: 16px; border: 1px solid var(--rand);
+  border-radius: 3px; vertical-align: middle;
+}
+
 label.regler {
   display: grid;
   grid-template-columns: 130px 1fr 60px;

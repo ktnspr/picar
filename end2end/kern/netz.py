@@ -9,6 +9,12 @@ es in 1–2 Minuten trainieren kann:
       → 4 Faltungsschichten: erkennen Kanten, dann Linienstücke, dann den Linienverlauf
       → 3 vollständig verbundene Schichten: entscheiden daraus den Lenkwinkel
     Lenkwinkel (eine Zahl von -1 = ganz links bis 1 = ganz rechts)
+
+Zwei Varianten:
+    B  nur das Kamerabild (feste Kamera)
+    C  Kamerabild + Schwenkwinkel der aktiven Kamera. Der Winkel wird hinter den
+       Faltungsschichten als zusätzliche Zahl eingespeist: Die Faltungen sehen, WO die
+       Linie im Bild liegt, der Schwenkwinkel sagt, wohin die Kamera dabei schaut.
 """
 
 import numpy as np
@@ -18,11 +24,13 @@ import torch.nn as nn
 from .konstanten import LENKUNG_MAX, NETZ_BREITE, NETZ_HOEHE
 
 ARCHITEKTUR = "PilotNet-klein (4 Faltungs- und 3 Dense-Schichten)"
+SCHWENK_SKALA = 90.0   # Schwenkwinkel (Grad) wird durch 90 geteilt → etwa −1 bis 1 wie die anderen Werte
 
 
 class PilotNetKlein(nn.Module):
-    def __init__(self):
+    def __init__(self, mit_schwenkwinkel=False):
         super().__init__()
+        self.mit_schwenkwinkel = mit_schwenkwinkel   # True = Variante C
         self.faltungen = nn.Sequential(
             # Faltung: ein kleines Fenster (z. B. 5×5 Pixel) wandert über das Bild und sucht Muster.
             # stride=2 heißt: das Fenster springt 2 Pixel weiter – das Bild wird dabei halb so groß.
@@ -34,13 +42,19 @@ class PilotNetKlein(nn.Module):
         )
         self.entscheidung = nn.Sequential(
             nn.Dropout(0.3),        # beim Training zufällig 30 % abschalten → lernt robuster
-            nn.Linear(480, 64), nn.ELU(),
+            nn.Linear(480 + (1 if mit_schwenkwinkel else 0), 64), nn.ELU(),
             nn.Linear(64, 16), nn.ELU(),
             nn.Linear(16, 1),
         )
 
-    def forward(self, x):
-        return self.entscheidung(self.faltungen(x))
+    def forward(self, x, schwenken=None):
+        merkmale = self.faltungen(x)
+        if not self.mit_schwenkwinkel:
+            return self.entscheidung(merkmale)
+        # Variante C: erst Dropout auf die Bildmerkmale, dann den Schwenkwinkel anhängen
+        merkmale = self.entscheidung[0](merkmale)
+        merkmale = torch.cat([merkmale, schwenken.reshape(-1, 1) / SCHWENK_SKALA], dim=1)
+        return self.entscheidung[1:](merkmale)
 
 
 def anzahl_parameter(netz):
@@ -53,10 +67,11 @@ def bilder_zu_tensor(bilder):
     return x.permute(0, 3, 1, 2) / 255.0 - 0.5
 
 
-def lenkwinkel_vorhersagen(netz, netzbild):
-    """Sagt für EIN Bild (48 × 160 × 3) den Lenkwinkel in Grad vorher."""
+def lenkwinkel_vorhersagen(netz, netzbild, schwenken=0.0):
+    """Sagt für EIN Bild (48 × 160 × 3) den Lenkwinkel in Grad vorher.
+    schwenken: Schwenkwinkel der Kamera in Grad (nur Variante C)."""
     with torch.no_grad():
-        ausgabe = netz(bilder_zu_tensor(netzbild[np.newaxis]))
+        ausgabe = netz(bilder_zu_tensor(netzbild[np.newaxis]), torch.tensor([float(schwenken)]))
     return float(np.clip(ausgabe.item(), -1, 1) * LENKUNG_MAX)
 
 

@@ -44,6 +44,7 @@ from kern.version import code_version  # noqa: E402
 import ankuendigung  # noqa: E402
 
 PROTOKOLL = 1                       # wird erhöht, wenn sich die Schnittstelle ändert
+VARIANTEN = ["B", "C"]              # B = nur Kamerabild, C = Kamerabild + Schwenkwinkel (aktive Kamera)
 KONFIGURATION = ORDNER / "config.json"
 ARBEITSORDNER = ORDNER / "auftraege"
 
@@ -158,6 +159,7 @@ def info():
         "geraet": dienst["geraet"],
         "messung": dienst["messung"],
         "torch": torch.__version__,
+        "varianten": VARIANTEN,
         "beschaeftigt": bool(auftrag and auftrag["training"].laeuft),
     }
 
@@ -212,9 +214,14 @@ async def auftrag_annehmen(anfrage: Request, einstellungen: str):
         torch.save(training.ergebnis_netz.state_dict(), puffer)
         auftrag["modell"] = puffer.getvalue()
 
+    try:
+        # prüft auch, ob die Fahrten zusammenpassen (gleiche Kalibrierung, gleiche Kameraeinstellungen)
+        training.starten(fahrt_ordner, bool(einstellungen.get("gruendlich")), bei_ende=fertig)
+    except ValueError as fehler:
+        shutil.rmtree(ordner, ignore_errors=True)
+        raise HTTPException(status_code=400, detail=str(fehler))
     dienst["auftrag"] = auftrag
-    training.starten(fahrt_ordner, bool(einstellungen.get("gruendlich")), bei_ende=fertig)
-    print(f"Auftrag {auftrag['id']}: {len(fahrt_ordner)} Fahrten, "
+    print(f"Auftrag {auftrag['id']}: Variante {training.variante}, {len(fahrt_ordner)} Fahrten, "
           f"{'gründlich' if einstellungen.get('gruendlich') else 'schnell'}, Gerät {dienst['geraet']}")
     return {"auftrag": auftrag["id"]}
 

@@ -46,7 +46,7 @@ def speichern(gewichte, meta):
     einmal in ein Netz – so fällt sofort auf, wenn sie nicht zum Netz passen.
     Ergebnis: die Modell-ID.
     """
-    PilotNetKlein().load_state_dict(gewichte)
+    PilotNetKlein(mit_schwenkwinkel=meta.get("variante") == "C").load_state_dict(gewichte)
     modell_id = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
     ordner = MODELLE / modell_id
     ordner.mkdir(parents=True)
@@ -59,10 +59,12 @@ def speichern(gewichte, meta):
 def laden(modell_id):
     """Lädt ein Modell. Ergebnis: (netz, meta)."""
     ordner = modell_ordner(modell_id)
-    netz = PilotNetKlein()
+    meta = _meta_lesen(ordner)
+    # Variante C hat einen Eingang mehr (Schwenkwinkel); ältere Modelle sind immer Variante B
+    netz = PilotNetKlein(mit_schwenkwinkel=meta.get("variante") == "C")
     netz.load_state_dict(torch.load(ordner / "modell.pt", weights_only=True))
     netz.eval()   # Vorhersage-Modus (z. B. kein Dropout)
-    return netz, _meta_lesen(ordner)
+    return netz, meta
 
 
 def alle_modelle():

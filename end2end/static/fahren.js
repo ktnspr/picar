@@ -80,6 +80,11 @@ setInterval(() => {
 // Modus 1: Daten aufnehmen
 // ---------------------------------------------------------------------
 
+// Feste oder aktive Kamera
+for (const knopf of document.querySelectorAll("input[name=kamera_modus]")) {
+  knopf.addEventListener("change", () => senden("/api/kamera_modus", { modus: knopf.value }));
+}
+
 document.getElementById("aufnahme-knopf").addEventListener("click",
   () => senden("/api/aufnahme", { aktion: "umschalten" }).then(() => setTimeout(fahrtenLaden, 300)));
 document.getElementById("pause-knopf").addEventListener("click",
@@ -105,7 +110,13 @@ function aufnahmeAnzeigen(zustand) {
   pause.textContent = a.pausiert ? "Weiter" : "Pause";
 
   // Während der Aufnahme bleiben Kamerawinkel und Bildausschnitt fest
-  schwenkenRegler.disabled = a.laeuft;
+  // Bei aktiver Kamera schwenkt der Regler – der Schwenk-Regler ist dann gesperrt
+  schwenkenRegler.disabled = a.laeuft || zustand.kamera_modus === "aktiv";
+  for (const knopf of document.querySelectorAll("input[name=kamera_modus]")) {
+    knopf.checked = knopf.value === zustand.kamera_modus;
+    knopf.disabled = a.laeuft;
+  }
+  reglerZustandAnzeigen(zustand);   // steht in regler.js
   neigenRegler.disabled = a.laeuft;
   ausschnittRegler.disabled = a.laeuft;
 
@@ -178,7 +189,7 @@ zustandAnzeigen = (zustand) => {
   }
   if (ersterZustand) {
     // Regler beim ersten Mal auf die Werte des Autos stellen
-    schwenkenRegler.value = zustand.schwenken;
+    schwenkenRegler.value = zustand.schwenken_fest;
     neigenRegler.value = zustand.neigen;
     schwenkenRegler.dispatchEvent(new Event("input"));
     neigenRegler.dispatchEvent(new Event("input"));

@@ -1,0 +1,47 @@
+<!-- Einstellungen der Kameraregelung (aktive Kamera) – wird in mehreren Reitern eingebunden -->
+<details class="karte regler-karte">
+  <summary><b>Kameraregelung</b> <span class="hinweis regler-zustand"></span></summary>
+  <p class="hinweis">
+    PD-Regler: Pro Kamerabild schwenkt die Kamera um <i>Kp</i> × Abweichung, gedämpft durch
+    <i>Kd</i> × Änderung der Abweichung. Innerhalb der Totzone bleibt sie ruhig.
+  </p>
+  <label class="regler">Kp
+    <input data-regler="kp" type="range" min="0.05" max="1" step="0.05"><output></output>
+  </label>
+  <label class="regler">Kd
+    <input data-regler="kd" type="range" min="0" max="0.6" step="0.05"><output></output>
+  </label>
+  <label class="regler">Totzone
+    <input data-regler="totzone" type="range" min="0" max="5" step="0.5"><output></output>
+  </label>
+  <label class="regler">Höchstgeschw.
+    <input data-regler="max_geschwindigkeit" type="range" min="30" max="300" step="10"><output></output>
+  </label>
+  <label class="regler">Suchgeschw.
+    <input data-regler="such_geschwindigkeit" type="range" min="20" max="200" step="10"><output></output>
+  </label>
+  <label class="regler">Schwenkbereich ±
+    <input data-regler="schwenk_max" type="range" min="20" max="90" step="5"><output></output>
+  </label>
+  <label class="regler">Verlust nach
+    <input data-regler="verlust_zeit" type="range" min="0.3" max="5" step="0.1"><output></output>
+  </label>
+  <label><input data-regler="richtung" type="checkbox"> Schwenkrichtung umkehren
+    <span class="hinweis">(falls die Kamera von der Linie wegläuft)</span></label>
+
+  <h3>Regler einmessen</h3>
+  <p class="hinweis">
+    Das Auto steht, die Linie ist im Bild. Für 16 Kombinationen aus Kp und Kd wird die Kamera
+    15° neben die Linie gedreht und losgelassen – einmal links, einmal rechts (etwa 1 Minute).
+    Gemessen werden <b>Einschwingzeit</b> (bis die Kamera ruhig auf der Linie ist),
+    <b>Überschwingen</b> (wie weit sie darüber hinausschießt) und <b>Unruhe</b> (wie sehr sie danach
+    noch zappelt). Note = Einschwingzeit + 0,03 × Überschwingen + 0,3 × Unruhe – kleiner ist besser.
+  </p>
+  <div class="knopfzeile">
+    <button class="einmessen-start">Regler einmessen</button>
+    <button class="einmessen-abbrechen gefahr" disabled>Abbrechen</button>
+  </div>
+  <div class="fortschritt"><div class="einmessen-balken"></div></div>
+  <p class="hinweis einmessen-text"></p>
+  <div class="einmessen-tabelle"></div>
+</details>

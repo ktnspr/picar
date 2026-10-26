@@ -5,7 +5,8 @@ Jede Fahrt bekommt einen eigenen Ordner, benannt nach ihrem Startzeitpunkt:
 
     daten/fahrten/2026-10-26_14-03-12/
         meta.json      Beschreibung der Fahrt: Anzeigename, Tempo, Kamerawinkel, Bildparameter ...
-        frames.csv     eine Zeile pro Bild: Dateiname, Lenkwinkel, Zeitstempel, Tempo
+        frames.csv     eine Zeile pro Bild: Dateiname, Lenkwinkel, Zeitstempel, Tempo,
+                       Kamera-Schwenkwinkel, Linienposition, „Linie sichtbar“
         bilder/        die Kamerabilder als JPEG (000001.jpg, 000002.jpg, ...)
 
 Der Ordnername ändert sich nie. Umbenennen ändert nur den Anzeigenamen in meta.json.
@@ -81,7 +82,14 @@ class Aufnahme:
         self._csv_datei = None
         self._sperre = threading.Lock()
 
-    def starten(self, tempo, schwenken, neigen, ausschnitt_oben):
+    def starten(self, tempo, schwenken, neigen, ausschnitt_oben, kamera_modus="fest",
+                regler=None, linienerkennung=None, kalibrierung=None):
+        """Beginnt eine neue Fahrt.
+
+        kamera_modus: "fest" oder "aktiv" (Kamera folgt der Linie, siehe kamera_regler.py)
+        regler, linienerkennung: deren Einstellungen – kommen in den Steckbrief der Fahrt
+        kalibrierung: die Servo-Kalibrierung (Lenkung, Kamera) während der Aufnahme
+        """
         with self._sperre:
             if self.laeuft:
                 return
@@ -93,6 +101,10 @@ class Aufnahme:
                 "erstellt": datetime.now().isoformat(timespec="seconds"),
                 "tempo": tempo,                       # wird am Ende zum Durchschnitt
                 "kamera": {"schwenken": schwenken, "neigen": neigen},
+                "kamera_modus": kamera_modus,         # "fest" oder "aktiv"
+                "regler": regler if kamera_modus == "aktiv" else None,
+                "linienerkennung": linienerkennung,
+                "kalibrierung": kalibrierung,
                 "bild": {
                     "breite": KAMERA_BREITE,
                     "hoehe": KAMERA_HOEHE,
@@ -106,7 +118,7 @@ class Aufnahme:
             meta_schreiben(self.ordner, self.meta)
             self._csv_datei = open(self.ordner / "frames.csv", "w", newline="")
             self._csv = csv.writer(self._csv_datei)
-            self._csv.writerow(["datei", "lenkwinkel", "zeit", "tempo"])
+            self._csv.writerow(["datei", "lenkwinkel", "zeit", "tempo", "schwenken", "linie_x", "linie_sichtbar"])
             self._tempo_summe = 0
             self._fahrzeit = 0.0
             self._letzte_zeit = None
@@ -118,7 +130,7 @@ class Aufnahme:
         if self.laeuft:
             self.pausiert = not self.pausiert
 
-    def bild_speichern(self, bild, lenkwinkel, tempo):
+    def bild_speichern(self, bild, lenkwinkel, tempo, schwenken=0.0, linie=None):
         """Speichert ein Bild – höchstens AUFNAHME_RATE-mal pro Sekunde."""
         jetzt = time.time()
         if jetzt - self._letztes_bild < 1 / AUFNAHME_RATE * 0.9:   # kleine Toleranz für den Kameratakt
@@ -131,7 +143,9 @@ class Aufnahme:
             dateiname = f"{self.anzahl:06d}.jpg"
             cv2.imwrite(str(self.ordner / "bilder" / dateiname), bild,
                         [cv2.IMWRITE_JPEG_QUALITY, JPEG_QUALITAET])
-            self._csv.writerow([dateiname, round(lenkwinkel, 2), round(jetzt, 3), tempo])
+            sichtbar = bool(linie and linie.sichtbar)
+            self._csv.writerow([dateiname, round(lenkwinkel, 2), round(jetzt, 3), tempo, round(schwenken, 2),
+                                round(linie.x, 1) if sichtbar else "", int(sichtbar)])
             self._tempo_summe += tempo
             # Fahrzeit: nur Abstände zwischen direkt aufeinanderfolgenden Bildern zählen,
             # damit Pausen und Stillstand nicht mitgerechnet werden.

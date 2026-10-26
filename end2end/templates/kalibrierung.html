@@ -10,7 +10,8 @@
   {% with seite = 'kalibrierung' %}{% include 'kopfzeile.html' %}{% endwith %}
 
   <main>
-    <img id="livebild" src="/video" alt="Livebild der Kamera">
+    <img id="livebild" src="/video" alt="Livebild der Kamera" style="cursor: crosshair"
+         title="Auf das Klebeband klicken, um seine Farbe festzulegen">
 
     <div>
       <div class="karte">
@@ -40,6 +41,57 @@
         <p id="meldung" class="hinweis"></p>
       </div>
 
+      <div class="karte">
+        <h2>Linienerkennung</h2>
+        <p class="hinweis">
+          Im Livebild: grüne bzw. rote Rahmen = Suchstreifen (grün: Linie gefunden), dicker
+          Strich = erkannte Linie, dünne senkrechte Linie = Bildmitte.
+          <b>Bandfarbe festlegen:</b> einfach ins Livebild auf das Klebeband klicken.
+        </p>
+        <label class="regler" style="grid-template-columns: 130px 1fr">Verfahren
+          <select id="linie-modus">
+            <option value="hell">hell – Band heller als der Boden (Otsu)</option>
+            <option value="dunkel">dunkel – Band dunkler als der Boden (Otsu)</option>
+            <option value="farbe">Farbe – wie die angeklickte Bandfarbe</option>
+          </select>
+        </label>
+        <p class="hinweis">Bandfarbe: <span id="linie-farbfeld" class="farbfeld"></span> <span id="linie-farbe">noch nicht gewählt</span></p>
+        <label class="regler">Farbtoleranz
+          <input data-linie="toleranz" type="range" min="5" max="60" step="1"><output></output>
+        </label>
+        <label class="regler">Mindestkontrast
+          <input data-linie="kontrast_min" type="range" min="5" max="80" step="1"><output></output>
+        </label>
+        <label class="regler">Mindesthelligkeit
+          <input data-linie="helligkeit_min" type="range" min="0" max="250" step="5"><output></output>
+        </label>
+        <label class="regler">Streifen (Höhe im Bild)
+          <input data-linie="streifen_y" type="range" min="0.1" max="0.95" step="0.05"><output></output>
+        </label>
+        <label class="regler">Streifenbreite (Pixel)
+          <input data-linie="streifen_hoehe" type="range" min="4" max="40" step="2"><output></output>
+        </label>
+        <label class="regler"><span><input data-linie="zweiter_streifen" type="checkbox"> naher Streifen</span>
+          <input data-linie="streifen2_y" type="range" min="0.5" max="0.98" step="0.01"><output></output>
+        </label>
+        <label class="regler">Mindestgröße (Pixel)
+          <input data-linie="min_pixel" type="range" min="10" max="300" step="10"><output></output>
+        </label>
+        <label class="regler">Bildwinkel der Kamera
+          <input data-linie="bildwinkel" type="range" min="40" max="70" step="0.5"><output></output>
+        </label>
+        <p class="hinweis" id="linie-status">–</p>
+        <div class="knopfzeile">
+          <button id="bildwinkel-messen">Bildwinkel ausmessen</button>
+          <button id="bildwinkel-uebernehmen" class="wichtig versteckt">Ergebnis übernehmen</button>
+        </div>
+        <p class="hinweis" id="bildwinkel-ergebnis">
+          Auto so hinstellen, dass die Linie gut sichtbar ist, dann „Bildwinkel ausmessen“: Die Kamera
+          schwenkt kurz auf −8° und +8°; aus der Wanderung der Linie im Bild folgt der Bildwinkel.
+          Nebenbei zeigt sich, ob die Schwenkrichtung für die aktive Kamera stimmt.
+        </p>
+      </div>
+
       <div class="karte hinweis">
         Gespeichert wird über die Kalibrierfunktionen der picarx-Bibliothek in
         <code>/opt/picar-x/picar-x.conf</code>. Die Werte gelten damit für alle Programme
@@ -51,5 +103,6 @@
 
   <script src="{{ url_for('static', filename='gemeinsam.js') }}"></script>
   <script src="{{ url_for('static', filename='kalibrierung.js') }}"></script>
+  <script src="{{ url_for('static', filename='linie.js') }}"></script>
 </body>
 </html>

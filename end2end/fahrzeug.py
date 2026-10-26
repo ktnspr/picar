@@ -155,6 +155,41 @@ class Fahrzeug:
         self.lenken(0)
         self.kamera_ausrichten(0, 0)
 
+    def kalibrierung_voruebergehend(self, werte):
+        """Setzt eine Kalibrierung nur für jetzt – OHNE sie zu speichern.
+
+        Damit fährt ein Modell mit genau der Kalibrierung, mit der seine Daten aufgenommen
+        wurden. Zurück zur gespeicherten Kalibrierung: kalibrierung_aus_datei().
+        """
+        with self._sperre:
+            self.px.dir_cali_val = float(werte["lenkung"])
+            self.px.cam_pan_cali_val = -float(werte["schwenken"])
+            self.px.cam_tilt_cali_val = -float(werte["neigen"])
+        self._servos_neu_stellen()
+
+    def kalibrierung_aus_datei(self):
+        """Wieder die gespeicherte (systemweite) Kalibrierung verwenden."""
+        with self._sperre:
+            datei = self.px.config_flie
+            self.px.dir_cali_val = float(datei.get("picarx_dir_servo", default_value=0))
+            self.px.cam_pan_cali_val = float(datei.get("picarx_cam_pan_servo", default_value=0))
+            self.px.cam_tilt_cali_val = float(datei.get("picarx_cam_tilt_servo", default_value=0))
+        self._servos_neu_stellen()
+
+    def gespeicherte_kalibrierung(self):
+        """Die Kalibrierung aus der Datei – auch während gerade eine vorübergehende gilt."""
+        datei = self.px.config_flie
+        return {
+            "lenkung": float(datei.get("picarx_dir_servo", default_value=0)),
+            "schwenken": -float(datei.get("picarx_cam_pan_servo", default_value=0)),
+            "neigen": -float(datei.get("picarx_cam_tilt_servo", default_value=0)),
+        }
+
+    def _servos_neu_stellen(self):
+        """Nach einer Änderung der Kalibrierung die Servos mit der neuen Mitte neu stellen."""
+        self.lenken(self.lenkwinkel)
+        self.kamera_ausrichten(self.schwenken, self.neigen)
+
     # ------------------------------------------------------------------
 
     def _motoren_einstellen(self):

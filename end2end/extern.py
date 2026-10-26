@@ -116,10 +116,13 @@ class ExternesTraining:
         return {"laeuft": self.laeuft, "text": self.text, "fortschritt": round(self.fortschritt, 3),
                 "kurven": self.kurven, "fehler": self.fehler, "fertig": self.ergebnis_gewichte is not None}
 
-    def starten(self, fahrt_ordner, gruendlich, bei_ende=None):
+    def starten(self, fahrt_ordner, gruendlich, bei_ende=None, variante="B"):
         self.info = info_abfragen(self.konfig)   # wirft Verbindungsfehler, wenn nicht erreichbar
         if self.info.get("beschaeftigt"):
             raise Verbindungsfehler(f"{self.info['name']} trainiert gerade schon etwas anderes.")
+        if variante not in self.info.get("varianten", ["B"]):   # ältere Dienste kennen nur Variante B
+            raise Verbindungsfehler(f"{self.info['name']} kann Variante {variante} noch nicht – bitte dort "
+                                    "„git pull“ ausführen und den Dienst neu starten.")
         self.laeuft, self._abbrechen, self._beenden, self._auftrag = True, False, False, None
         self.text, self.fortschritt, self.kurven, self.fehler = "Starte ...", 0.0, {}, None
         self.ergebnis_gewichte, self.ergebnis_meta = None, None

@@ -31,7 +31,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 
-from .datensatz import daten_laden, meta_lesen
+from .datensatz import aufnahme_einstellungen, daten_laden, einheitlichkeit_pruefen, meta_lesen
 from .konstanten import LENKUNG_MAX, NETZ_BREITE, NETZ_HOEHE
 from .netz import ARCHITEKTUR, PilotNetKlein, anzahl_parameter, bilder_zu_tensor
 from .version import code_version
@@ -91,26 +91,29 @@ def stichproben_gewichte(winkel):
     return torch.from_numpy(gewicht)
 
 
-def verbessern(x, y):
-    """Augmentierung: zufällig spiegeln (Lenkwinkel umdrehen) und Helligkeit verändern."""
+def verbessern(x, y, schwenken):
+    """Augmentierung: zufällig spiegeln (Lenkwinkel umdrehen) und Helligkeit verändern.
+    Beim Spiegeln dreht sich auch der Schwenkwinkel der Kamera um (Variante C)."""
     spiegeln = torch.rand(len(x)) < 0.5
-    x = x.clone()
-    y = y.clone()
+    x, y, schwenken = x.clone(), y.clone(), schwenken.clone()
     x[spiegeln] = x[spiegeln].flip(-1)       # links ↔ rechts
     y[spiegeln] = -y[spiegeln]
+    schwenken[spiegeln] = -schwenken[spiegeln]
     faktor = 1 + (torch.rand(len(x), 1, 1, 1) * 2 - 1) * HELLIGKEIT
     x = ((x + 0.5) * faktor).clamp(0, 1) - 0.5
-    return x, y
+    return x, y, schwenken
 
 
-def fehler_in_grad(netz, bilder, winkel, indizes, geraet):
+def fehler_in_grad(netz, bilder, winkel, schwenkwinkel, indizes, geraet):
     """Mittlerer Fehler der Vorhersage in Grad (ohne Augmentierung)."""
     netz.eval()
     summe = 0.0
     with torch.no_grad():
         for start in range(0, len(indizes), 256):
             teil = indizes[start:start + 256]
-            vorhersage = netz(bilder_zu_tensor(bilder[teil]).to(geraet)).squeeze(1).clamp(-1, 1).cpu()
+            x = bilder_zu_tensor(bilder[teil]).to(geraet)
+            s = torch.from_numpy(schwenkwinkel[teil]).to(geraet)
+            vorhersage = netz(x, s).squeeze(1).clamp(-1, 1).cpu()
             summe += (vorhersage - torch.from_numpy(winkel[teil])).abs().sum().item()
     return summe / len(indizes) * LENKUNG_MAX
 
@@ -150,6 +153,12 @@ class Training:
             raise ValueError("Es läuft bereits ein Training.")
         if not fahrt_ordner:
             raise ValueError("Bitte mindestens eine Fahrt auswählen.")
+        # Nur Fahrten mit denselben Aufnahme-Einstellungen passen zusammen
+        unterschiede = einheitlichkeit_pruefen([meta_lesen(ordner) for ordner in fahrt_ordner])
+        if unterschiede:
+            raise ValueError("Die Fahrten passen nicht zusammen: " + " | ".join(unterschiede))
+        # Variante: feste Kamera → B (nur Bild), aktive Kamera → C (Bild + Schwenkwinkel)
+        self.variante = "C" if aufnahme_einstellungen(meta_lesen(fahrt_ordner[0]))["kamera_modus"] == "aktiv" else "B"
         self.laeuft, self._abbrechen, self._beenden = True, False, False
         self.text, self.fortschritt, self.kurven = "Starte ...", 0.0, {}
         self.ergebnis_netz, self.ergebnis_meta, self.fehler = None, None, None
@@ -193,7 +202,8 @@ class Training:
         modus = "gruendlich" if gruendlich else "schnell"
 
         # 1. und 2.: Daten laden, Blöcke bilden
-        bilder, winkel, bloecke, fahrt_nummern = daten_laden(fahrt_ordner, lambda t: self._melden(t, 0.02))
+        bilder, winkel, schwenkwinkel, bloecke, fahrt_nummern = daten_laden(fahrt_ordner, lambda t: self._melden(t, 0.02))
+        self._schwenkwinkel = schwenkwinkel
         alle_bloecke = np.unique(bloecke)
         if len(alle_bloecke) < 2 * HOLDOUT_JEDER:
             raise ValueError("Zu wenige Daten – bitte mindestens etwa 30 Sekunden Fahrt auswählen.")
@@ -256,7 +266,8 @@ class Training:
     def _lernen(self, bilder, winkel, lern_idx, pruef_idx, name, fortschritt, lernraten=None):
         """Trainiert ein frisches Netz. Mit Prüfdaten: bis zum Early Stopping. Ohne: feste Lernraten-Liste."""
         torch.manual_seed(0)
-        netz = PilotNetKlein().to(self.geraet)
+        netz = PilotNetKlein(mit_schwenkwinkel=self.variante == "C").to(self.geraet)
+        s_alle = torch.from_numpy(self._schwenkwinkel)
         optimierer = torch.optim.Adam(netz.parameters(), lr=LERNRATE)
         planer = torch.optim.lr_scheduler.ReduceLROnPlateau(optimierer, factor=0.5, patience=GEDULD_LERNRATE)
         gewichte = stichproben_gewichte(winkel[lern_idx])
@@ -285,9 +296,9 @@ class Training:
                     break   # „Beenden“ gedrückt – diese Epoche nicht mehr zu Ende rechnen
                 teil = auswahl[b:b + BATCH]
                 # Augmentierung auf der CPU, dann aufs Rechengerät (CPU oder Apple-Grafikeinheit)
-                x, y = verbessern(bilder_zu_tensor(bilder[teil]), y_alle[teil])
-                x, y = x.to(self.geraet), y.to(self.geraet)
-                vorhersage = netz(x).squeeze(1)
+                x, y, s = verbessern(bilder_zu_tensor(bilder[teil]), y_alle[teil], s_alle[teil])
+                x, y, s = x.to(self.geraet), y.to(self.geraet), s.to(self.geraet)
+                vorhersage = netz(x, s).squeeze(1)
                 verlust = nn.functional.mse_loss(vorhersage, y)
                 optimierer.zero_grad()
                 verlust.backward()
@@ -302,7 +313,7 @@ class Training:
             lern_kurve.append(round(fehler_summe / len(auswahl) * LENKUNG_MAX, 2))
 
             if pruef_idx is not None:
-                pruef_fehler = fehler_in_grad(netz, bilder, winkel, pruef_idx, self.geraet)
+                pruef_fehler = fehler_in_grad(netz, bilder, winkel, self._schwenkwinkel, pruef_idx, self.geraet)
                 pruef_kurve.append(round(pruef_fehler, 2))
                 planer.step(pruef_fehler)   # wird es nicht besser → Lernrate verringern
                 if pruef_fehler < bester_fehler:
@@ -338,18 +349,19 @@ class Training:
         """Stellt alle Angaben zum Modell zusammen (der Steckbrief, als meta.json gespeichert)."""
         infos = [meta_lesen(ordner) | {"id": ordner.name} for ordner in fahrt_ordner]
         gesamt = sum(i["frames"] for i in infos)
-
-        def haeufigster(werte_mit_gewicht):
-            """Der Wert, der bei den meisten Bildern verwendet wurde – und ob alle gleich waren."""
-            zaehler = {}
-            for wert, gewicht in werte_mit_gewicht:
-                zaehler[wert] = zaehler.get(wert, 0) + gewicht
-            return max(zaehler, key=zaehler.get), len(zaehler) == 1
-
-        kamera, kamera_einheitlich = haeufigster(
-            ((i["kamera"]["schwenken"], i["kamera"]["neigen"]), i["frames"]) for i in infos)
-        ausschnitt, ausschnitt_einheitlich = haeufigster((i["bild"]["ausschnitt_oben"], i["frames"]) for i in infos)
+        erste = infos[0]   # alle Fahrten haben dieselben Aufnahme-Einstellungen (geprüft beim Start)
         return {
+            "variante": self.variante,
+            "eingaben": ["bild", "schwenkwinkel"] if self.variante == "C" else ["bild"],
+            # Alles, was beim Fahren genauso eingestellt werden muss wie bei der Aufnahme:
+            "aufnahme": {
+                "kamera_modus": erste.get("kamera_modus", "fest"),
+                "kamera": erste["kamera"],
+                "ausschnitt_oben": erste["bild"]["ausschnitt_oben"],
+                "kalibrierung": erste.get("kalibrierung"),         # None = unbekannt (ältere Fahrten)
+                "regler": erste.get("regler"),                     # nur bei aktiver Kamera
+                "linienerkennung": erste.get("linienerkennung"),
+            },
             "fahrten": [{"id": i["id"], "anzeigename": i["anzeigename"], "frames": i["frames"]} for i in infos],
             "bilder_gesamt": int(len(bilder)),
             "modus": modus,
@@ -366,12 +378,10 @@ class Training:
             "geraet": self.geraet.type,          # "cpu" oder "mps"
             "code_version": code_version(),
             "bildgroesse": [NETZ_HOEHE, NETZ_BREITE],
-            "ausschnitt_oben": ausschnitt,
-            "ausschnitt_einheitlich": ausschnitt_einheitlich,
-            "kamera": {"schwenken": kamera[0], "neigen": kamera[1]},
-            "kamera_einheitlich": kamera_einheitlich,
+            "ausschnitt_oben": erste["bild"]["ausschnitt_oben"],
+            "kamera": erste["kamera"],
             "tempo": round(sum(i["tempo"] * i["frames"] for i in infos) / gesamt),
             "architektur": ARCHITEKTUR,
-            "parameter": anzahl_parameter(PilotNetKlein()),
+            "parameter": anzahl_parameter(PilotNetKlein(mit_schwenkwinkel=self.variante == "C")),
             "lernkurve": self.kurven,
         }

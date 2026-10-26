@@ -1,18 +1,22 @@
 """
 konfiguration.py – Dauerhaft gespeicherte Einstellungen des Pi (konfiguration.json).
 
-Zurzeit: die externe Trainingsressource (Adresse, Port, Token). Die Datei enthält das
-Token und kommt deshalb NICHT ins Git-Repository – als Vorlage dient
-konfiguration.example.json.
+Zurzeit: die externe Trainingsressource (Adresse, Port, Token) und die Einstellungen
+von Linienerkennung und Kameraregelung. Die Datei enthält das Token und kommt deshalb
+NICHT ins Git-Repository – als Vorlage dient konfiguration.example.json.
 """
 
 import json
 
+import kamera_regler
+import linie
 from einstellungen import PROJEKT
 
 DATEI = PROJEKT / "konfiguration.json"
 STANDARD = {
     "extern": {"aktiv": False, "name": "", "host": "", "port": 8765, "token": ""},
+    "linie": dict(linie.STANDARD),     # Linienerkennung (siehe linie.py)
+    "regler": dict(kamera_regler.STANDARD),   # Kameraregelung (siehe kamera_regler.py)
 }
 
 

@@ -65,9 +65,38 @@ Die Lernkurve zeigt den Fehler beim Lernen und beim Prüfen. Mit etwa 4000 Bilde
 „schnell“ rund 6 Minuten, „gründlich“ rund 15. Unter „Wo trainieren?“ lässt sich statt des Pi
 eine externe Trainingsressource wählen (siehe unten).
 
-**3. Autonom fahren:** Modell wählen – Kamerawinkel, Bildausschnitt und Geschwindigkeit
-werden wie in den Trainingsdaten eingestellt. Das Netz lenkt schon im Stand (zum Ausprobieren).
+**3. Autonom fahren:** Modell wählen – alles wird so eingestellt wie bei der Aufnahme der
+Trainingsdaten (siehe „Varianten“). Das Netz lenkt schon im Stand (zum Ausprobieren).
 Motoren ein, „Autonom fahren“. Controller: A = Start/Stopp, B = Notstopp.
+
+## Aktive Kamera
+
+Statt geradeaus zu schauen, kann die Kamera der Klebeband-Linie folgen: Eine Linienerkennung
+(klassische Bildverarbeitung, `linie.py`) findet die Linie in einem waagerechten Suchstreifen,
+ein PD-Regler (`kamera_regler.py`) schwenkt die Kamera so, dass sie in der Bildmitte bleibt.
+Der Schwenkwinkel zeigt dann, wohin die Linie vor dem Auto läuft – hilfreich in engen Kurven.
+
+- **Linienerkennung einstellen** (Seite „Kalibrierung“): Verfahren „hell“ (Otsu, mit
+  Mindesthelligkeit gegen helle Dielenfugen) oder „Farbe“ (Klick aufs Band im Livebild).
+  „Bildwinkel ausmessen“ schwenkt die Kamera um ±8° und misst, wie weit die Linie wandert.
+- **Aktive Kamera einschalten:** Reiter „1 · Daten aufnehmen“ → Kamera „aktiv“.
+- **Regler einmessen:** Feld „Kameraregelung“ → „Regler einmessen“ probiert 16 Kombinationen
+  aus Kp und Kd aus (Sprungantwort) und schlägt die beste vor (`regler_einmessen.py`).
+
+## Varianten und sortenreine Daten
+
+| Variante | Aufnahme mit | Netz bekommt | Beim Fahren |
+|---|---|---|---|
+| **B** | fester Kamera | Kamerabild | Kamera steht fest |
+| **C** | aktiver Kamera | Kamerabild + Schwenkwinkel | Kamera folgt der Linie |
+
+Die Variante ergibt sich aus den Trainingsdaten. Trainiert wird nur mit **sortenreinen** Fahrten:
+gleicher Kameramodus, gleiche Kalibrierung, gleiche Kamerastellung, gleicher Bildausschnitt und –
+bei aktiver Kamera – gleiche Regler- und Linienerkennungs-Einstellungen. Passt etwas nicht, zeigt
+die Weboberfläche, was, und das Training bleibt gesperrt (auch auf dem Mac).
+
+Das Modell speichert alle diese Aufnahme-Einstellungen. Beim autonomen Fahren werden sie
+**vorübergehend** übernommen – auch die Kalibrierung –, danach gilt wieder das Gespeicherte.
 
 ## Messwerte auf dem Raspberry Pi 5
 
@@ -108,7 +137,7 @@ jedes Modells hält fest, wo, auf welchem Gerät und wie lange trainiert wurde.
 | `kern/netz.py` | Das neuronale Netz (PilotNet, verkleinert) |
 | `kern/vorverarbeitung.py` | Ausschnitt aus dem Kamerabild → Bild fürs Netz |
 | `kern/datensatz.py` | Fahrten von der Festplatte lesen, Blöcke bilden |
-| `kern/training.py` | Training: Augmentierung, Ausgleich, Early Stopping, blockweise Validierung |
+| `kern/training.py` | Training: Augmentierung, Ausgleich, Early Stopping, blockweise Validierung (Variante B und C) |
 | `kern/konstanten.py`, `kern/version.py` | Netzgröße, Lenkbereich; Code-Version (Git-Commit) |
 
 **Pi:**
@@ -122,6 +151,10 @@ jedes Modells hält fest, wo, auf welchem Gerät und wie lange trainiert wurde.
 | `controller.py` | Nintendo-Controller mit evdev auslesen (zum Testen direkt startbar) |
 | `fahrten.py` | Fahrten aufnehmen, speichern, umbenennen, löschen |
 | `trainingssteuerung.py` | Training starten (Pi oder extern, mit Rückfall) und Modell speichern |
+| `linie.py` | Linienerkennung im Kamerabild (Suchstreifen, Schwellwert, Tracking) |
+| `kamera_regler.py` | PD-Regler für die aktive Kamera, Suche bei verlorener Linie |
+| `regler_einmessen.py` | Bewertung von Sprungantworten zum Einmessen der Reglerwerte |
+| `akku.py` | Ladestand aus der Akkuspannung |
 | `extern.py` | Mit der externen Trainingsressource sprechen (Suche, Test, Training) |
 | `konfiguration.py` | Gespeicherte Einstellungen (`konfiguration.json`) |
 | `modelle.py` | Modelle speichern, laden, umbenennen, löschen |
