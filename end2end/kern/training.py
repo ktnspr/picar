@@ -1,5 +1,5 @@
 """
-training.py – Trainiert das Netz im Hintergrund.
+training.py – Trainiert das Netz im Hintergrund (gemeinsam für Pi und Mac).
 
 Ablauf im Modus „schnell“:
   1. Daten laden: aus jedem Bild den Ausschnitt fürs Netz ausschneiden und verkleinern.
@@ -18,25 +18,25 @@ liefert aber ein verlässlicheres Ergebnis.
 Warum Blöcke statt zufälliger Aufteilung? Bei 10 Bildern pro Sekunde sind benachbarte
 Bilder fast gleich. Würden wir zufällig aufteilen, hätte das Netz zu fast jedem
 Prüfbild einen „Zwilling“ beim Lernen gesehen – das Ergebnis wäre geschönt.
+
+Gespeichert wird hier nichts: Das fertige Netz und sein Steckbrief stehen am Ende in
+ergebnis_netz und ergebnis_meta. Was damit passiert, entscheidet der Aufrufer
+(der Pi speichert es als Modell, der Mac schickt es an den Pi zurück).
 """
 
-import csv
 import threading
 import time
 
-import cv2
 import numpy as np
 import torch
 import torch.nn as nn
 
-import fahrten
-import modelle
-from einstellungen import LENKUNG_MAX, NETZ_BREITE, NETZ_HOEHE
-from kamera import netz_ausschnitt
-from netz import ARCHITEKTUR, PilotNetKlein, anzahl_parameter, bilder_zu_tensor
+from .datensatz import daten_laden, meta_lesen
+from .konstanten import LENKUNG_MAX, NETZ_BREITE, NETZ_HOEHE
+from .netz import ARCHITEKTUR, PilotNetKlein, anzahl_parameter, bilder_zu_tensor
+from .version import code_version
 
 # ---------- Aufteilung in Blöcke ----------
-BLOCK_SEKUNDEN = 3.0      # Länge eines Blocks
 PUFFER_BILDER = 5         # so viele Bilder (0,5 s) Abstand zwischen Lern- und Prüfdaten
 HOLDOUT_JEDER = 5         # jeder 5. Block wird Prüfblock → 20 %
 FALTEN = 4                # Kreuzvalidierung im Modus „gründlich“
@@ -50,7 +50,6 @@ MAX_EPOCHEN = 60          # Sicherheitsgrenze, falls Early Stopping nie greift
 HELLIGKEIT = 0.2          # Helligkeit zufällig um ±20 % ändern
 KLASSEN_BREITE = 5        # Grad – für den Ausgleich häufiger und seltener Lenkwinkel
 MAX_GEWICHT = 5           # seltene Lenkwinkel höchstens 5-mal so oft zeigen wie häufige
-THREADS = 3               # Rechenkerne fürs Training (einer bleibt frei für die Weboberfläche)
 
 
 class Abgebrochen(Exception):
@@ -58,35 +57,8 @@ class Abgebrochen(Exception):
 
 
 # ----------------------------------------------------------------------
-# 1. und 2.: Daten laden und Blöcke bilden
+# 2.: Lern- und Prüfdaten trennen (die Blöcke bildet datensatz.py)
 # ----------------------------------------------------------------------
-
-def daten_laden(fahrt_ids, melden):
-    """Lädt alle Bilder der Fahrten. Ergebnis: Bilder, Lenkwinkel (−1 bis 1), Block-Nummer, Fahrt-Nummer."""
-    bilder, winkel, bloecke, fahrt_nummern = [], [], [], []
-    block = -1
-    for nummer, fahrt_id in enumerate(fahrt_ids):
-        ordner = fahrten.fahrt_ordner(fahrt_id)
-        ausschnitt = fahrten.meta_lesen(ordner)["bild"]["ausschnitt_oben"]
-        zeilen = fahrten.frames_lesen(fahrt_id)
-        block_beginn, letzte_zeit = None, None
-        for i, zeile in enumerate(zeilen):
-            zeit = float(zeile["zeit"])
-            # Neuer Block nach 3 Sekunden – oder wenn die Fahrt unterbrochen war
-            if block_beginn is None or zeit - block_beginn >= BLOCK_SEKUNDEN or zeit - letzte_zeit > 0.5:
-                block += 1
-                block_beginn = zeit
-            letzte_zeit = zeit
-            bild = cv2.imread(str(ordner / "bilder" / zeile["datei"]))
-            bilder.append(netz_ausschnitt(bild, ausschnitt))
-            winkel.append(float(zeile["lenkwinkel"]) / LENKUNG_MAX)
-            bloecke.append(block)
-            fahrt_nummern.append(nummer)
-            if i % 200 == 0:
-                melden(f"Lade Fahrt {nummer + 1}/{len(fahrt_ids)}: Bild {i}/{len(zeilen)}")
-    return (np.stack(bilder), np.array(winkel, np.float32),
-            np.array(bloecke), np.array(fahrt_nummern))
-
 
 def aufteilen(bloecke, fahrt_nummern, pruef_bloecke):
     """Teilt in Lern- und Prüfdaten. Lernbilder direkt neben Prüfblöcken werden weggelassen (Puffer)."""
@@ -131,46 +103,57 @@ def verbessern(x, y):
     return x, y
 
 
-def fehler_in_grad(netz, bilder, winkel, indizes):
+def fehler_in_grad(netz, bilder, winkel, indizes, geraet):
     """Mittlerer Fehler der Vorhersage in Grad (ohne Augmentierung)."""
     netz.eval()
     summe = 0.0
     with torch.no_grad():
         for start in range(0, len(indizes), 256):
             teil = indizes[start:start + 256]
-            vorhersage = netz(bilder_zu_tensor(bilder[teil])).squeeze(1).clamp(-1, 1)
+            vorhersage = netz(bilder_zu_tensor(bilder[teil]).to(geraet)).squeeze(1).clamp(-1, 1).cpu()
             summe += (vorhersage - torch.from_numpy(winkel[teil])).abs().sum().item()
     return summe / len(indizes) * LENKUNG_MAX
 
 
 class Training:
-    """Führt ein Training im Hintergrund aus und berichtet über den Fortschritt."""
+    """Führt ein Training im Hintergrund aus und berichtet über den Fortschritt.
 
-    def __init__(self):
+    geraet:  "cpu" oder "mps" (Grafikeinheit der Apple-Chips)
+    threads: so viele Rechenkerne benutzen (None = alle, die PyTorch möchte)
+    """
+
+    def __init__(self, geraet="cpu", threads=None):
+        self.geraet = torch.device(geraet)
+        self.threads = threads
+        self.ergebnis_netz = None   # nach dem Training: das fertige Netz (auf der CPU)
+        self.ergebnis_meta = None   # ... und sein Steckbrief
         self.laeuft = False
         self.text = ""
         self.fortschritt = 0.0
         self.kurven = {}        # Name → Liste der Fehler pro Epoche (für die Lernkurve)
-        self.ergebnis = None    # nach dem Training: ID des neuen Modells
         self.fehler = None
         self._abbrechen = False   # alles verwerfen
         self._beenden = False     # aufhören und das bisher beste Modell speichern
 
     def status(self):
         return {"laeuft": self.laeuft, "text": self.text, "fortschritt": round(self.fortschritt, 3),
-                "kurven": self.kurven, "ergebnis": self.ergebnis, "fehler": self.fehler}
+                "kurven": self.kurven, "fehler": self.fehler, "fertig": self.ergebnis_netz is not None}
 
-    def starten(self, fahrt_ids, gruendlich):
+    def starten(self, fahrt_ordner, gruendlich, bei_ende=None):
+        """Startet das Training im Hintergrund.
+
+        fahrt_ordner: Liste der Ordner der Fahrten (pathlib.Path)
+        bei_ende:     wird nach erfolgreichem Training aufgerufen (mit diesem Training-Objekt),
+                      solange laeuft noch True ist – z. B. um das Modell zu speichern.
+        """
         if self.laeuft:
             raise ValueError("Es läuft bereits ein Training.")
-        if not fahrt_ids:
+        if not fahrt_ordner:
             raise ValueError("Bitte mindestens eine Fahrt auswählen.")
-        for fahrt_id in fahrt_ids:
-            fahrten.fahrt_ordner(fahrt_id)   # prüft, ob es die Fahrten gibt
         self.laeuft, self._abbrechen, self._beenden = True, False, False
         self.text, self.fortschritt, self.kurven = "Starte ...", 0.0, {}
-        self.ergebnis, self.fehler = None, None
-        threading.Thread(target=self._ausfuehren, args=(fahrt_ids, gruendlich), daemon=True).start()
+        self.ergebnis_netz, self.ergebnis_meta, self.fehler = None, None, None
+        threading.Thread(target=self._ausfuehren, args=(fahrt_ordner, gruendlich, bei_ende), daemon=True).start()
 
     def abbrechen(self):
         """Sofort aufhören und nichts speichern."""
@@ -182,9 +165,11 @@ class Training:
 
     # ------------------------------------------------------------------
 
-    def _ausfuehren(self, fahrt_ids, gruendlich):
+    def _ausfuehren(self, fahrt_ordner, gruendlich, bei_ende):
         try:
-            self._trainieren(fahrt_ids, gruendlich)
+            self._trainieren(fahrt_ordner, gruendlich)
+            if bei_ende:
+                bei_ende(self)
         except Abgebrochen:
             self.text = "Training abgebrochen."
         except Exception as fehler:
@@ -201,13 +186,14 @@ class Training:
         if fortschritt is not None:
             self.fortschritt = fortschritt
 
-    def _trainieren(self, fahrt_ids, gruendlich):
-        torch.set_num_threads(THREADS)
+    def _trainieren(self, fahrt_ordner, gruendlich):
+        if self.threads:
+            torch.set_num_threads(self.threads)
         startzeit = time.time()
         modus = "gruendlich" if gruendlich else "schnell"
 
         # 1. und 2.: Daten laden, Blöcke bilden
-        bilder, winkel, bloecke, fahrt_nummern = daten_laden(fahrt_ids, lambda t: self._melden(t, 0.02))
+        bilder, winkel, bloecke, fahrt_nummern = daten_laden(fahrt_ordner, lambda t: self._melden(t, 0.02))
         alle_bloecke = np.unique(bloecke)
         if len(alle_bloecke) < 2 * HOLDOUT_JEDER:
             raise ValueError("Zu wenige Daten – bitte mindestens etwa 30 Sekunden Fahrt auswählen.")
@@ -257,11 +243,11 @@ class Training:
                 epochen = final["epochen"]
                 hinweis = f"Vorzeitig beendet: finales Training nach {epochen} Epochen gestoppt."
 
-        # Speichern – mit allem, was man über das Modell wissen sollte
-        self._melden("Speichere Modell ...", 0.97)
-        meta = self._beschreibung(fahrt_ids, modus, methode, ergebnisse, epochen, bilder, startzeit)
+        # Ergebnis bereitstellen – mit allem, was man über das Modell wissen sollte
+        self._melden("Stelle das Ergebnis zusammen ...", 0.97)
+        meta = self._beschreibung(fahrt_ordner, modus, methode, ergebnisse, epochen, bilder, startzeit)
         meta["hinweis"] = hinweis
-        self.ergebnis = modelle.speichern(netz, meta)
+        self.ergebnis_netz, self.ergebnis_meta = netz.to("cpu"), meta
         mae = meta["validierung"]["fehler_grad"]
         self._melden(f"Fertig in {meta['trainingsdauer_s']:.0f} s – mittlerer Fehler {mae:.1f}° "
                      f"(zum Vergleich: immer geradeaus {meta['validierung']['vergleich_grad']:.1f}°)."
@@ -270,7 +256,7 @@ class Training:
     def _lernen(self, bilder, winkel, lern_idx, pruef_idx, name, fortschritt, lernraten=None):
         """Trainiert ein frisches Netz. Mit Prüfdaten: bis zum Early Stopping. Ohne: feste Lernraten-Liste."""
         torch.manual_seed(0)
-        netz = PilotNetKlein()
+        netz = PilotNetKlein().to(self.geraet)
         optimierer = torch.optim.Adam(netz.parameters(), lr=LERNRATE)
         planer = torch.optim.lr_scheduler.ReduceLROnPlateau(optimierer, factor=0.5, patience=GEDULD_LERNRATE)
         gewichte = stichproben_gewichte(winkel[lern_idx])
@@ -298,7 +284,9 @@ class Training:
                 if self._beenden:
                     break   # „Beenden“ gedrückt – diese Epoche nicht mehr zu Ende rechnen
                 teil = auswahl[b:b + BATCH]
+                # Augmentierung auf der CPU, dann aufs Rechengerät (CPU oder Apple-Grafikeinheit)
                 x, y = verbessern(bilder_zu_tensor(bilder[teil]), y_alle[teil])
+                x, y = x.to(self.geraet), y.to(self.geraet)
                 vorhersage = netz(x).squeeze(1)
                 verlust = nn.functional.mse_loss(vorhersage, y)
                 optimierer.zero_grad()
@@ -314,7 +302,7 @@ class Training:
             lern_kurve.append(round(fehler_summe / len(auswahl) * LENKUNG_MAX, 2))
 
             if pruef_idx is not None:
-                pruef_fehler = fehler_in_grad(netz, bilder, winkel, pruef_idx)
+                pruef_fehler = fehler_in_grad(netz, bilder, winkel, pruef_idx, self.geraet)
                 pruef_kurve.append(round(pruef_fehler, 2))
                 planer.step(pruef_fehler)   # wird es nicht besser → Lernrate verringern
                 if pruef_fehler < bester_fehler:
@@ -346,9 +334,9 @@ class Training:
         wert = fortschritt[0] + fortschritt[1] * min((epoche - 1 + anteil_epoche) / erwartet, 1)
         self._melden(text, max(self.fortschritt, wert))   # der Balken soll nicht zurückspringen
 
-    def _beschreibung(self, fahrt_ids, modus, methode, ergebnisse, epochen, bilder, startzeit):
-        """Stellt alle Angaben zum Modell zusammen (wird als meta.json gespeichert)."""
-        infos = [fahrten.meta_lesen(fahrten.fahrt_ordner(f)) | {"id": f} for f in fahrt_ids]
+    def _beschreibung(self, fahrt_ordner, modus, methode, ergebnisse, epochen, bilder, startzeit):
+        """Stellt alle Angaben zum Modell zusammen (der Steckbrief, als meta.json gespeichert)."""
+        infos = [meta_lesen(ordner) | {"id": ordner.name} for ordner in fahrt_ordner]
         gesamt = sum(i["frames"] for i in infos)
 
         def haeufigster(werte_mit_gewicht):
@@ -375,6 +363,8 @@ class Training:
             },
             "epochen": epochen,
             "trainingsdauer_s": round(time.time() - startzeit, 1),
+            "geraet": self.geraet.type,          # "cpu" oder "mps"
+            "code_version": code_version(),
             "bildgroesse": [NETZ_HOEHE, NETZ_BREITE],
             "ausschnitt_oben": ausschnitt,
             "ausschnitt_einheitlich": ausschnitt_einheitlich,

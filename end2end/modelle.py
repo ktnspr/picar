@@ -18,7 +18,7 @@ from datetime import datetime
 import torch
 
 from einstellungen import MODELLE
-from netz import PilotNetKlein
+from kern.netz import PilotNetKlein
 
 
 def _meta_lesen(ordner):
@@ -39,12 +39,18 @@ def modell_ordner(modell_id):
     return ordner
 
 
-def speichern(netz, meta):
-    """Speichert ein frisch trainiertes Netz samt Beschreibung. Ergebnis: die Modell-ID."""
+def speichern(gewichte, meta):
+    """Speichert die Gewichte (state_dict) eines frisch trainierten Netzes samt Steckbrief.
+
+    Egal ob auf dem Pi oder dem Mac trainiert: Vor dem Speichern laden wir die Gewichte
+    einmal in ein Netz – so fällt sofort auf, wenn sie nicht zum Netz passen.
+    Ergebnis: die Modell-ID.
+    """
+    PilotNetKlein().load_state_dict(gewichte)
     modell_id = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
     ordner = MODELLE / modell_id
     ordner.mkdir(parents=True)
-    torch.save(netz.state_dict(), ordner / "modell.pt")
+    torch.save(gewichte, ordner / "modell.pt")
     meta = {"anzeigename": modell_id, "erstellt": datetime.now().isoformat(timespec="seconds"), **meta}
     _meta_schreiben(ordner, meta)
     return modell_id

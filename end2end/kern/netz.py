@@ -15,7 +15,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 
-from einstellungen import LENKUNG_MAX, NETZ_BREITE, NETZ_HOEHE
+from .konstanten import LENKUNG_MAX, NETZ_BREITE, NETZ_HOEHE
 
 ARCHITEKTUR = "PilotNet-klein (4 Faltungs- und 3 Dense-Schichten)"
 

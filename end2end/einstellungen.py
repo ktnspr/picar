@@ -8,6 +8,9 @@ Die Kamera schafft 60 Bilder/s bei 320×240, das Netz rechnet ein Bild in etwa
 
 from pathlib import Path
 
+# Was Pi und Mac gleich verwenden müssen, steht im gemeinsamen Kern
+from kern.konstanten import LENKUNG_MAX, NETZ_BREITE, NETZ_HOEHE  # noqa: F401
+
 # ---------- Webserver ----------
 PORT = 8080
 
@@ -29,14 +32,10 @@ JPEG_QUALITAET = 90            # beim Speichern der Fahrten
 # kann der Ausschnitt weiter oben beginnen. In der Weboberfläche einstellbar.
 AUSSCHNITT_OBEN = 0.25
 
-# ---------- Neuronales Netz ----------
-NETZ_HOEHE, NETZ_BREITE = 48, 160   # so groß ist das Bild, das ins Netz geht
-
 # ---------- Taktung ----------
 AUFNAHME_RATE = 10             # gespeicherte Bilder pro Sekunde beim Aufnehmen
 INFERENZ_RATE = 30             # Lenkentscheidungen pro Sekunde beim autonomen Fahren
 
 # ---------- Fahren ----------
-LENKUNG_MAX = 30               # Grad; mehr kann die Lenkung nicht
 TEMPO_STANDARD = 100           # Prozent
 KAMERA_NEIGEN_STANDARD = -20   # Grad; leicht nach unten, damit die Kamera den Boden sieht

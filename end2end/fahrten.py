@@ -21,11 +21,7 @@ from datetime import datetime
 import cv2
 
 from einstellungen import AUFNAHME_RATE, FAHRTEN, JPEG_QUALITAET, KAMERA_BREITE, KAMERA_HOEHE
-
-
-def meta_lesen(ordner):
-    with open(ordner / "meta.json", encoding="utf-8") as datei:
-        return json.load(datei)
+from kern.datensatz import meta_lesen  # noqa: F401 – Fahrten lesen steht im gemeinsamen Kern
 
 
 def meta_schreiben(ordner, meta):
@@ -70,12 +66,6 @@ def vorschaubild(fahrt_id):
     """Pfad zu einem Bild aus der Mitte der Fahrt (oder None, wenn sie leer ist)."""
     bilder = sorted((fahrt_ordner(fahrt_id) / "bilder").glob("*.jpg"))
     return bilder[len(bilder) // 2] if bilder else None
-
-
-def frames_lesen(fahrt_id):
-    """Alle Zeilen aus frames.csv als Liste von Dictionaries."""
-    with open(fahrt_ordner(fahrt_id) / "frames.csv", newline="") as datei:
-        return list(csv.DictReader(datei))
 
 
 class Aufnahme:

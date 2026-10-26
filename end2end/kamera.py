@@ -4,6 +4,7 @@ kamera.py – Liest die Frontkamera und bereitet die Bilder für das Netz vor.
 Die Kamera liefert direkt kleine Bilder (320×240) mit 30 Bildern pro Sekunde.
 Ein Hintergrund-Thread holt ständig das neueste Bild ab. Wer ein Bild braucht
 (Aufnahme, Netz, Livebild im Browser), nimmt sich das neueste.
+Den Ausschnitt fürs Netz macht kern/vorverarbeitung.py (gleich für Pi und Mac).
 
 Hinweis zu den Farben: picamera2 nennt das Format „RGB888“, legt die Farben im
 Speicher aber in der Reihenfolge Blau-Grün-Rot ab – genau so, wie OpenCV es erwartet.
@@ -16,8 +17,7 @@ import cv2
 import numpy as np
 from picamera2 import Picamera2
 
-from einstellungen import (AUSSCHNITT_OBEN, KAMERA_BILDRATE, KAMERA_BREITE, KAMERA_HOEHE,
-                           LENKUNG_MAX, NETZ_BREITE, NETZ_HOEHE)
+from einstellungen import AUSSCHNITT_OBEN, KAMERA_BILDRATE, KAMERA_BREITE, KAMERA_HOEHE, LENKUNG_MAX
 
 
 class Kamera:
@@ -58,12 +58,6 @@ class Kamera:
         time.sleep(0.1)
         self.picam.stop()
         self.picam.close()
-
-
-def netz_ausschnitt(bild, ausschnitt_oben=AUSSCHNITT_OBEN):
-    """Schneidet den unteren Bildteil (Boden) aus und verkleinert ihn auf die Netzgröße."""
-    oben = int(bild.shape[0] * ausschnitt_oben)
-    return cv2.resize(bild[oben:, :], (NETZ_BREITE, NETZ_HOEHE), interpolation=cv2.INTER_AREA)
 
 
 def overlay_zeichnen(bild, lenkwinkel=None, text="", farbe=(0, 220, 0), ausschnitt_oben=AUSSCHNITT_OBEN):

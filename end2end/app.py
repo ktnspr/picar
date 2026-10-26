@@ -23,8 +23,9 @@ import fahrten
 import modelle
 from controller import Controller
 from einstellungen import AUSSCHNITT_OBEN, KAMERA_NEIGEN_STANDARD, LENKUNG_MAX, PORT, TEMPO_STANDARD
-from kamera import Kamera, netz_ausschnitt, overlay_zeichnen
-from netz import lenkwinkel_vorhersagen
+from kamera import Kamera, overlay_zeichnen
+from kern.netz import lenkwinkel_vorhersagen
+from kern.vorverarbeitung import netz_ausschnitt
 
 # Kommt so lange keine Anfrage der Weboberfläche, werden die Motoren ausgeschaltet
 # (Seite geschlossen, Notebook zugeklappt, WLAN weg).
@@ -61,12 +62,12 @@ def kamera_starten():
 kamera = kamera_starten()
 
 from fahrzeug import Fahrzeug  # noqa: E402 – erst nach der Kamera-Prüfung die Hardware übernehmen
-from training import Training  # noqa: E402
+from trainingssteuerung import Trainingssteuerung  # noqa: E402
 
 fahrzeug = Fahrzeug()
 controller = Controller()
 aufnahme = fahrten.Aufnahme()
-training = Training()
+training = Trainingssteuerung()
 app = Flask(__name__)
 
 ROT = (40, 40, 230)      # Farben für das Overlay (OpenCV: Blau, Grün, Rot)
