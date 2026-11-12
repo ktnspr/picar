@@ -128,10 +128,21 @@ Lenkwinkel (−30° … +30°)
 **Grafikvorschlag:** Schichten als kleiner werdende, gestapelte Quader (klassische CNN-Darstellung),
 darunter die Beschriftung „Kanten → Linienstücke → Linienverlauf → Lenkwinkel“.
 
-### Tricks beim Training (für Neugierige, auf dem Poster gern knapp)
-- **Spiegeln:** Jedes Bild wird zufällig auch gespiegelt verwendet, mit umgedrehtem Lenkwinkel. So
-  gibt es doppelt so viele Beispiele, und Links- und Rechtskurven kommen gleich oft vor.
-- **Helligkeit variieren:** Damit das Auto auch bei anderem Licht fährt.
+### Augmentierung: aus wenigen Fahrten mehr Beispiele machen
+Beim Training werden die Bilder bei jedem Durchgang zufällig ein wenig verändert. Das Netz sieht
+dadurch nie zweimal exakt dasselbe Bild. So lernt es das Prinzip, statt die Bilder auswendig zu
+lernen, und kommt auch mit Situationen zurecht, die so nicht aufgenommen wurden.
+
+| Veränderung | Wie | Wozu |
+|---|---|---|
+| **Spiegeln** | Die Hälfte der Bilder wird links-rechts gespiegelt, der Lenkwinkel wird umgedreht (aus +12° wird −12°) | doppelt so viele Beispiele, Links- und Rechtskurven kommen gleich oft vor |
+| **Helligkeit** | Jedes Bild zufällig bis zu 20 % heller oder dunkler | fährt auch bei anderem Licht, z. B. Fenster oder Deckenlampe |
+| **Dropout** | Beim Lernen wird jedes Mal ein zufälliger Teil der Merkmale „ausgeschaltet“ (30 %) | das Netz verlässt sich nicht auf einzelne Merkmale, sondern auf mehrere |
+
+**Grafikvorschlag:** Ein Originalbild in der Mitte, darum herum drei Varianten (gespiegelt mit
+umgedrehtem Lenkpfeil, heller, dunkler), Überschrift „Aus 1 Bild werden viele“.
+
+### Weitere Tricks beim Training (für Neugierige, auf dem Poster gern knapp)
 - **Seltene Fälle öfter zeigen:** Meist fährt man fast geradeaus. Scharfe Kurven sind selten und
   werden deshalb beim Lernen häufiger gezeigt.
 - **Ehrlich prüfen:** Ein Teil der Fahrt wird beim Lernen weggelassen und nur zum Prüfen benutzt.
@@ -172,8 +183,16 @@ Bild jetzt     ─► Auge (CNN) ─► 64 Merkmale ─┘
 - Das Gedächtnis hat nur rund **9.400 zusätzliche Gewichte**, insgesamt also etwa 65.000.
 
 **Training in zwei Stufen** (anschaulich: „erst sehen lernen, dann erinnern lernen“):
-1. **Sehen:** Das Auge lernt wie ein normales Einzelbild-Netz.
+1. **Sehen:** Das Auge lernt wie ein normales Einzelbild-Netz, mit Spiegeln, Helligkeit und Dropout.
 2. **Erinnern:** Das Auge bleibt fest, nur die GRU lernt, die Bildfolge auszuwerten.
+
+**Augmentierung beim Gedächtnis:** Hier wird immer die **ganze Bildfolge auf einmal gespiegelt**.
+Aus „die Linie verschwindet links, also links zurücklenken“ wird so ein zweites, genauso gültiges
+Beispiel: „die Linie verschwindet rechts, also rechts zurücklenken“. Würde man die Bilder einzeln
+spiegeln, ergäbe die Folge keinen Sinn mehr, weil die Linie dann wild hin- und herspringen würde.
+Zusätzlich werden 20 % der Merkmale zufällig weggelassen (Dropout).
+**Grafikvorschlag:** zwei Filmstreifen übereinander, oben das Original, unten gespiegelt, mit
+entgegengesetzten Lenkpfeilen am Ende.
 
 **Beim Fahren:** Das Auge verarbeitet jedes neue Kamerabild nur einmal, die Merkmale der älteren
 Bilder liegen im Gedächtnis bereit. Eine Lenkentscheidung mit Gedächtnis dauert auf dem
@@ -209,10 +228,15 @@ links zurück.“
 „abdriften, Taste gehalten, wird nicht gelernt“, dann ein grüner Abschnitt „zurücklenken, wird
 gelernt“.
 
+**Driftfahrten und Augmentierung ergänzen sich:** Spiegeln macht aus jeder Rettung nach links
+automatisch auch eine Rettung nach rechts. Trotzdem lohnt es sich, in beide Richtungen
+abzudriften, weil die Strecke selbst nicht symmetrisch ist.
+
 **Schöner Hintergrund für Interessierte:** Dieses Problem ist in der Forschung zum Nachahmungslernen
 bekannt. Ein Netz, das nur perfekte Fahrten gesehen hat, weiß nicht, was es tun soll, sobald es
 selbst einen kleinen Fehler macht. Die Fehler schaukeln sich dann auf. NVIDIA hat 2016 dafür
-seitliche Zusatzkameras benutzt, wir benutzen Driftfahrten.
+seitliche Zusatzkameras und künstlich verschobene Bilder benutzt (auch eine Art Augmentierung).
+Wir benutzen Driftfahrten.
 
 ---
 
@@ -346,5 +370,7 @@ aus: Schieben Sie das Auto vorsichtig von der Linie weg und schauen Sie, ob es z
 | End-to-End | Ein einziges Netz vom Rohbild bis zur Aktion, ohne handprogrammierte Zwischenschritte |
 | Imitation Learning | Lernen durch Nachahmen eines Menschen |
 | Epoche | Ein Durchgang, in dem das Netz alle Lernbeispiele einmal gesehen hat |
+| Augmentierung | Trainingsbilder zufällig verändern (spiegeln, aufhellen …), damit das Netz mehr und vielfältigere Beispiele hat |
+| Dropout | Beim Lernen zufällig Teile des Netzes ausschalten, damit es sich nicht auf Einzelheiten verlässt |
 | Overfitting | Das Netz lernt die Beispiele auswendig, statt das Prinzip zu verstehen |
 | Validierung | Prüfen mit Daten, die beim Lernen nicht benutzt wurden: die ehrliche Note |
