@@ -17,7 +17,7 @@ auf dessen Merkmalen, sich an die letzten 4 Sekunden zu erinnern. Weil das Auge 
 fest bleibt, rechnet es jedes Bild nur einmal – deshalb dauert Stufe 2 nur kurz. Sie läuft
 auch nach „Beenden“ noch zu Ende, denn ohne sie gäbe es kein Bildfolge-Modell.
 
-Bilder, die beim Aufnehmen als „abgedriftet“ markiert wurden (L-Taste), sind nie Lernziel:
+Bilder, die beim Aufnehmen als „abgedriftet“ markiert wurden (Abdrift-Taste), sind nie Lernziel:
 Das Netz soll nicht lernen, von der Linie wegzufahren. Als Vorgeschichte in einer Bildfolge
 kommen sie aber vor – genau dafür wurden sie aufgenommen.
 
@@ -252,7 +252,7 @@ class Training:
             self._fenster = fenster_bilden(daten.zeiten, daten.abschnitte)
 
         def nur_lernziele(indizes):
-            """Abgedriftete Bilder (L-Taste) sind nie Lernziel – weder beim Lernen noch beim Prüfen."""
+            """Abgedriftete Bilder (Abdrift-Taste) sind nie Lernziel – weder beim Lernen noch beim Prüfen."""
             return indizes[daten.lernen[indizes]]
 
         # 3.: Probetraining(s) mit Validierung
@@ -472,7 +472,7 @@ class Training:
             },
             "fahrten": [{"id": i["id"], "anzeigename": i["anzeigename"], "frames": i["frames"]} for i in infos],
             "bilder_gesamt": int(len(daten.bilder)),
-            "bilder_nur_vorgeschichte": int((~daten.lernen).sum()),   # abgedriftet (L-Taste): kein Lernziel
+            "bilder_nur_vorgeschichte": int((~daten.lernen).sum()),   # abgedriftet (Abdrift-Taste): kein Lernziel
             "modus": modus,
             "validierung": {
                 "methode": methode,

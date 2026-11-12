@@ -11,7 +11,7 @@ Jede Fahrt bekommt einen eigenen Ordner, benannt nach ihrem Startzeitpunkt:
 
 Der Ordnername ändert sich nie. Umbenennen ändert nur den Anzeigenamen in meta.json.
 
-„lernen“ = 0 heißt: Bei diesem Bild wurde die L-Taste gehalten – das Auto driftet absichtlich
+„lernen“ = 0 heißt: Bei diesem Bild wurde die Abdrift-Taste (R oder ZR) gehalten – das Auto driftet absichtlich
 von der Linie ab. Das Bild ist dann nur Vorgeschichte für die Variante „Bildfolge“
 (sie soll lernen, wohin die Linie verschwunden ist), aber nie Lernziel: Das Netz soll ja
 nicht lernen, von der Linie wegzufahren.
@@ -82,7 +82,7 @@ class Aufnahme:
         self.pausiert = False
         self.ordner = None
         self.anzahl = 0
-        self.anzahl_nur_vorgeschichte = 0   # Bilder mit gehaltener L-Taste
+        self.anzahl_nur_vorgeschichte = 0   # Bilder mit gehaltener Abdrift-Taste
         self._fahrzeit = 0.0
         self._letztes_bild = 0.0
         self._csv_datei = None
@@ -119,7 +119,7 @@ class Aufnahme:
                     "aufnahme_rate": AUFNAHME_RATE,
                 },
                 "frames": 0,
-                "frames_nur_vorgeschichte": 0,   # abgedriftet (L-Taste): kein Lernziel
+                "frames_nur_vorgeschichte": 0,   # abgedriftet (Abdrift-Taste): kein Lernziel
                 "dauer_s": 0.0,
             }
             meta_schreiben(self.ordner, self.meta)
@@ -140,7 +140,7 @@ class Aufnahme:
 
     def bild_speichern(self, bild, lenkwinkel, tempo, schwenken=0.0, linie=None, lernen=True):
         """Speichert ein Bild – höchstens AUFNAHME_RATE-mal pro Sekunde.
-        lernen=False: absichtlich abgedriftet (L-Taste) – nur Vorgeschichte, kein Lernziel."""
+        lernen=False: absichtlich abgedriftet (Abdrift-Taste) – nur Vorgeschichte, kein Lernziel."""
         jetzt = time.time()
         if jetzt - self._letztes_bild < 1 / AUFNAHME_RATE * 0.9:   # kleine Toleranz für den Kameratakt
             return

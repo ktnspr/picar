@@ -80,7 +80,7 @@ async function summeAnzeigen() {
     const meldungen = pruefung.passt ? [...pruefung.hinweise]
       : ["Diese Fahrten passen nicht zusammen – so kann nicht trainiert werden:", ...pruefung.unterschiede];
     if (pruefung.passt && variante === "bildfolge" && !pruefung.nur_vorgeschichte) {
-      meldungen.push("Die Fahrten enthalten keine Rettungsfahrten (L-Taste). Ohne sie hat das Gedächtnis " +
+      meldungen.push("Die Fahrten enthalten keine Rettungsfahrten (Abdrift-Taste R/ZR). Ohne sie hat das Gedächtnis " +
                      "kaum Gelegenheit zu lernen, wohin die Linie verschwunden ist.");
     }
     warnung.innerHTML = "";

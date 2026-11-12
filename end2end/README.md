@@ -56,14 +56,14 @@ Netz sieht), Motoren ein, mit dem Controller fahren:
 | B | anhalten |
 | + | Aufnahme starten / stoppen |
 | − | Pause (zum Umsetzen des Autos) |
-| L (gedrückt halten) | absichtlich abdriften: Bilder sind nur Vorgeschichte, nie Lernziel |
+| R oder ZR (gedrückt halten) | absichtlich abdriften: Bilder sind nur Vorgeschichte, nie Lernziel |
 
 Gespeichert wird nur, während das Auto fährt: 10 Bilder pro Sekunde mit Lenkwinkel.
 Fahrten lassen sich umbenennen und löschen.
 
-**Rettungsfahrten** (für die Variante „Bildfolge“): L halten und von der Linie wegfahren, bis sie
-aus dem Bild verschwunden ist – L loslassen und zurücklenken. So enthalten die Daten, was das
-Gedächtnis lernen soll: „Die Linie ist links verschwunden, also links zurück.“ Die Bilder mit L
+**Rettungsfahrten** (für die Variante „Bildfolge“): R oder ZR halten und von der Linie wegfahren, bis
+sie aus dem Bild verschwunden ist – loslassen und zurücklenken. So enthalten die Daten, was das
+Gedächtnis lernen soll: „Die Linie ist links verschwunden, also links zurück.“ Die Bilder mit gehaltener Taste
 werden gespeichert (Spalte `lernen` = 0 in `frames.csv`), aber nie als Lenkbeispiel gelernt –
 das Netz soll ja nicht lernen, von der Linie wegzufahren. Nicht mit Pause arbeiten: Dann fehlt
 gerade das Abdriften in der Vorgeschichte.

@@ -86,6 +86,7 @@ kameraregler = kamera_regler.Kameraregler(konfiguration.laden()["regler"])
 einmessung = {"laeuft": False, "fortschritt": 0.0, "text": "", "ergebnisse": [], "beste": None,
               "fehler": None, "abbrechen": False, "regler": None, "aufzeichnung": [], "profil": "flott"}
 controller = Controller()
+ABDRIFT_TASTEN = ("R", "ZR")   # gedrückt halten = absichtlich abdriften (rechter Zeigefinger, links wird gelenkt)
 kopplung = Kopplung(controller)   # Controller per Bluetooth koppeln (Seite „Kalibrierung“)
 aufnahme = fahrten.Aufnahme()
 training = Trainingssteuerung()
@@ -901,8 +902,8 @@ def aufnahme_schritt(bild):
     if lenkwinkel != fahrzeug.lenkwinkel:
         fahrzeug.lenken(lenkwinkel)
 
-    # L-Taste gehalten: absichtlich abdriften – diese Bilder sind nur Vorgeschichte, kein Lernziel
-    abdriften = "L" in controller.gedrueckt
+    # Abdrift-Taste gehalten: absichtlich abdriften – diese Bilder sind nur Vorgeschichte, kein Lernziel
+    abdriften = any(taste in controller.gedrueckt for taste in ABDRIFT_TASTEN)
 
     # Bilder nur speichern, während das Auto wirklich fährt
     if aufnahme.laeuft and fahrzeug.faehrt():
