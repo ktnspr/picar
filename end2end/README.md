@@ -17,7 +17,8 @@ cd ~/prof-playground/end2end
 
 Das legt die Python-Umgebung `.venv` an (PyTorch, evdev, NumPy, OpenCV, Flask – etwa 900 MB).
 Außerdem nötig: SunFounder-Module (robot-hat, vilib, picar-x), ein gekoppelter
-Nintendo Switch Pro Controller und einmalig:
+Nintendo Switch Pro Controller (koppeln: Seite „Kalibrierung“ → „Controller koppeln“, dann die
+SYNC-Taste oben am Controller halten, bis die LEDs laufen) und einmalig:
 
 ```bash
 sudo mkdir -p /opt/picar-x && sudo chown pi:pi /opt/picar-x
@@ -186,6 +187,7 @@ jedes Modells hält fest, wo, auf welchem Gerät und wie lange trainiert wurde.
 | `fahrzeug.py` | Motoren (mit elektronischem Differential), Lenkung, Kamera-Servos, Kalibrierung |
 | `kamera.py` | Kamerabilder holen, Overlay im Livebild |
 | `controller.py` | Nintendo-Controller mit evdev auslesen (zum Testen direkt startbar) |
+| `controller_koppeln.py` | Controller per Bluetooth koppeln (Knopf auf der Kalibrierseite) |
 | `fahrten.py` | Fahrten aufnehmen, speichern, umbenennen, löschen |
 | `trainingssteuerung.py` | Training starten (Pi oder extern, mit Rückfall) und Modell speichern |
 | `linie.py` | Linienerkennung im Kamerabild (Suchstreifen, Schwellwert, Tracking) |

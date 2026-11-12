@@ -29,6 +29,7 @@ from akku import spannung_zu_prozent
 import konfiguration
 import modelle
 from controller import Controller
+from controller_koppeln import Kopplung
 from einstellungen import (AUSSCHNITT_OBEN, KAMERA_BREITE, KAMERA_NEIGEN_STANDARD, LENKUNG_MAX, PORT,
                            TEMPO_STANDARD)
 from kamera import Kamera, overlay_zeichnen
@@ -85,6 +86,7 @@ kameraregler = kamera_regler.Kameraregler(konfiguration.laden()["regler"])
 einmessung = {"laeuft": False, "fortschritt": 0.0, "text": "", "ergebnisse": [], "beste": None,
               "fehler": None, "abbrechen": False, "regler": None, "aufzeichnung": [], "profil": "flott"}
 controller = Controller()
+kopplung = Kopplung(controller)   # Controller per Bluetooth koppeln (Seite „Kalibrierung“)
 aufnahme = fahrten.Aufnahme()
 training = Trainingssteuerung()
 app = Flask(__name__)
@@ -979,6 +981,25 @@ def steuerschleife():
 # ----------------------------------------------------------------------
 # Kalibrierung
 # ----------------------------------------------------------------------
+
+@app.post("/api/controller/koppeln")
+def controller_koppeln():
+    if zustand["modus"] != "kalibrierung":
+        return jsonify({"fehler": "Koppeln geht nur auf der Seite „Kalibrierung“."}), 409
+    kopplung.starten()
+    return jsonify(kopplung.status())
+
+
+@app.get("/api/controller/koppeln")
+def controller_koppeln_status():
+    return jsonify(kopplung.status())
+
+
+@app.post("/api/controller/koppeln/abbrechen")
+def controller_koppeln_abbrechen():
+    kopplung.abbrechen()
+    return jsonify(kopplung.status())
+
 
 @app.get("/api/kalibrierung")
 def kalibrierung_lesen():
