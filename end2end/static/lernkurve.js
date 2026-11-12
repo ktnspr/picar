@@ -10,17 +10,23 @@ const SVG_NS = "http://www.w3.org/2000/svg";
 
 // Aus allen Kurven eines Trainings die zeigen, die man vergleichen will:
 // das (letzte) Probetraining mit Lernen und Prüfen, dazu das finale Modell.
+// Bei der Variante „Bildfolge“ gibt es zwei Stufen („Sehen · …“ und „Erinnern · …“) –
+// gezeigt wird immer die Stufe, die zuletzt dran war.
 function kurvenAuswaehlen(kurven) {
-  const namen = Object.keys(kurven || {});
-  const proben = namen.filter((n) => n.startsWith("Probetraining") && n.endsWith(": Prüfen") && kurven[n].length);
+  const namen = Object.keys(kurven || {}).filter((n) => kurven[n].length);
+  const FINAL = "Finales Modell: Lernen";
+  const finale = namen.filter((n) => n.endsWith(FINAL));
+  const final = finale.length ? finale[finale.length - 1] : null;
+  const stufe = final ? final.slice(0, -FINAL.length) : null;   // "", "Sehen · " oder "Erinnern · "
+  const proben = namen.filter((n) => n.includes("Probetraining") && n.endsWith(": Prüfen") && (stufe === null || n.startsWith(stufe)));
   const probe = proben.length ? proben[proben.length - 1].replace(": Prüfen", "") : null;
   const auswahl = [];
   if (probe) {
     auswahl.push({ name: "Lernen", werte: kurven[probe + ": Lernen"] || [], farbe: KURVEN_FARBEN.lernen });
     auswahl.push({ name: "Prüfen", werte: kurven[probe + ": Prüfen"], farbe: KURVEN_FARBEN.pruefen });
   }
-  if (kurven && kurven["Finales Modell: Lernen"] && kurven["Finales Modell: Lernen"].length) {
-    auswahl.push({ name: "Finales Modell (alle Daten)", werte: kurven["Finales Modell: Lernen"], farbe: KURVEN_FARBEN.final });
+  if (final) {
+    auswahl.push({ name: "Finales Modell (alle Daten)", werte: kurven[final], farbe: KURVEN_FARBEN.final });
   }
   return { probe: probe, reihen: auswahl.filter((r) => r.werte.length) };
 }

@@ -15,7 +15,7 @@ async function modellAuswahlLaden() {
   for (const modell of liste) {
     const option = document.createElement("option");
     option.value = modell.id;
-    option.textContent = `${modell.anzeigename} – Variante ${modell.variante || "B"}, Fehler ${modell.validierung.fehler_grad.toFixed(1)}°`;
+    option.textContent = `${modell.anzeigename} – ${VARIANTEN[modell.variante || "einzelbild"].kurz}, Fehler ${modell.validierung.fehler_grad.toFixed(1)}°`;
     modellAuswahl.appendChild(option);
   }
   modellAuswahl.value = gewaehlt;
@@ -24,7 +24,7 @@ async function modellAuswahlLaden() {
 function modellInfoAnzeigen(modellId) {
   const modell = modellListe.find((m) => m.id === modellId);
   document.getElementById("modell-info").textContent = modell
-    ? `Variante ${varianteText(modell)}. Eingestellt wie bei der Aufnahme der Trainingsdaten – Kamera: ` +
+    ? `Variante: ${varianteText(modell)}. Eingestellt wie bei der Aufnahme der Trainingsdaten – Kamera: ` +
       `${kameraText(modell)}; Bildausschnitt ab ${Math.round(modell.ausschnitt_oben * 100)} %; ` +
       `Kalibrierung: ${kalibrierungText(modell)}; Tempo ${modell.tempo} %. ` +
       `Trainiert mit: ${modell.fahrten.map((f) => f.anzeigename).join(", ")}.`

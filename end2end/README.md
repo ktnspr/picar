@@ -55,11 +55,20 @@ Netz sieht), Motoren ein, mit dem Controller fahren:
 | B | anhalten |
 | + | Aufnahme starten / stoppen |
 | − | Pause (zum Umsetzen des Autos) |
+| L (gedrückt halten) | absichtlich abdriften: Bilder sind nur Vorgeschichte, nie Lernziel |
 
 Gespeichert wird nur, während das Auto fährt: 10 Bilder pro Sekunde mit Lenkwinkel.
 Fahrten lassen sich umbenennen und löschen.
 
-**2. Trainieren:** Fahrten auswählen, „schnell“ oder „gründlich“, Training starten.
+**Rettungsfahrten** (für die Variante „Bildfolge“): L halten und von der Linie wegfahren, bis sie
+aus dem Bild verschwunden ist – L loslassen und zurücklenken. So enthalten die Daten, was das
+Gedächtnis lernen soll: „Die Linie ist links verschwunden, also links zurück.“ Die Bilder mit L
+werden gespeichert (Spalte `lernen` = 0 in `frames.csv`), aber nie als Lenkbeispiel gelernt –
+das Netz soll ja nicht lernen, von der Linie wegzufahren. Nicht mit Pause arbeiten: Dann fehlt
+gerade das Abdriften in der Vorgeschichte.
+
+**2. Trainieren:** Fahrten auswählen, bei fester Kamera das Netz („Einzelbild“ oder „Bildfolge“),
+„schnell“ oder „gründlich“, Training starten.
 Es läuft, bis das Netz 5 Epochen lang nicht besser wird; „Beenden & speichern“ hört früher auf.
 Die Lernkurve zeigt den Fehler beim Lernen und beim Prüfen. Mit etwa 4000 Bildern dauert
 „schnell“ rund 6 Minuten, „gründlich“ rund 15. Unter „Wo trainieren?“ lässt sich statt des Pi
@@ -87,10 +96,37 @@ Der Schwenkwinkel zeigt dann, wohin die Linie vor dem Auto läuft – hilfreich 
 
 | Variante | Aufnahme mit | Netz bekommt | Beim Fahren |
 |---|---|---|---|
-| **B** | fester Kamera | Kamerabild | Kamera steht fest |
-| **C** | aktiver Kamera | Kamerabild + Schwenkwinkel | Kamera folgt der Linie |
+| **Einzelbild** (`einzelbild`) | fester Kamera | Kamerabild | Kamera steht fest |
+| **Bild + Schwenkwinkel** (`bild_und_schwenkwinkel`) | aktiver Kamera | Kamerabild + Schwenkwinkel | Kamera folgt der Linie |
+| **Bildfolge** (`bildfolge`) | fester Kamera | Kamerabild + Bilder der letzten 4 s | Kamera steht fest |
 
-Die Variante ergibt sich aus den Trainingsdaten. Trainiert wird nur mit **sortenreinen** Fahrten:
+Die Varianten sind danach benannt, was das Netz als Eingabe bekommt (festgelegt in `kern/netz.py`).
+Bei aktiver Kamera ergibt sich die Variante aus den Daten, bei fester Kamera wählt man beim Training
+zwischen Einzelbild und Bildfolge – mit denselben Fahrten, so lassen sich beide fair vergleichen.
+
+### Bildfolge: ein Netz mit Gedächtnis
+
+Ein Einzelbild-Netz ist ratlos, wenn die Linie aus dem Bild verschwunden ist: Es sieht nur
+Boden und weiß nicht, ob die Linie links oder rechts hinausgelaufen ist. Die Bildfolge sieht
+zusätzlich die Bilder von vor 0,2 s, 0,4 s … 4 s (21 Bilder) und kann sich das „merken“.
+
+- **Aufbau:** Ein Einzelbild-Netz ist das *Auge* und rechnet aus jedem Bild 64 Merkmale. Eine
+  GRU (ein kleines rückgekoppeltes Netz, RNN) liest die Merkmale der Folge vom ältesten zum
+  neuesten Bild, aktualisiert dabei ihren inneren Zustand (32 Zahlen) und bestimmt daraus den
+  Lenkwinkel.
+- **Training in zwei Stufen:** 1. *Sehen* – das Auge lernt wie ein Einzelbild-Netz.
+  2. *Erinnern* – das Auge bleibt fest, nur die GRU lernt. Weil das Auge jedes Bild nur einmal
+  rechnet, ist Stufe 2 schnell. Der Steckbrief zeigt beide Fehler: mit Gedächtnis und
+  „ohne Gedächtnis“ (dasselbe Auge allein) – daran sieht man, ob das Gedächtnis hilft.
+- **Gleiche Regel beim Lernen und Fahren** (`kern/bildfolge.py`): Zu jedem Zeitpunkt der Folge
+  wird das zeitlich nächste Bild genommen – beim Lernen aus der Fahrt (10 Bilder/s), beim Fahren
+  aus der Kamera (30 Bilder/s). Reicht die Vorgeschichte nicht so weit zurück (Anfang einer
+  Fahrt, nach einem Halt), wird das älteste vorhandene Bild wiederholt. Eine Folge reicht nie über
+  einen Halt oder in eine andere Fahrt.
+- **Rückblick und Bildabstand** stehen in `kern/konstanten.py` und im Steckbrief jedes Modells.
+  Beim Fahren gilt immer der Wert des Modells.
+
+Trainiert wird nur mit **sortenreinen** Fahrten:
 gleicher Kameramodus, gleiche Kalibrierung, gleiche Kamerastellung, gleicher Bildausschnitt und –
 bei aktiver Kamera – gleiche Regler- und Linienerkennungs-Einstellungen. Passt etwas nicht, zeigt
 die Weboberfläche, was, und das Training bleibt gesperrt (auch auf dem Mac).
@@ -134,11 +170,12 @@ jedes Modells hält fest, wo, auf welchem Gerät und wie lange trainiert wurde.
 
 | Datei | Aufgabe |
 |---|---|
-| `kern/netz.py` | Das neuronale Netz (PilotNet, verkleinert) |
+| `kern/netz.py` | Die neuronalen Netze (PilotNet, verkleinert; Bildfolge mit GRU) |
+| `kern/bildfolge.py` | Welche früheren Bilder gehören zu einer Bildfolge (Training und Fahren) |
 | `kern/vorverarbeitung.py` | Ausschnitt aus dem Kamerabild → Bild fürs Netz |
 | `kern/datensatz.py` | Fahrten von der Festplatte lesen, Blöcke bilden |
-| `kern/training.py` | Training: Augmentierung, Ausgleich, Early Stopping, blockweise Validierung (Variante B und C) |
-| `kern/konstanten.py`, `kern/version.py` | Netzgröße, Lenkbereich; Code-Version (Git-Commit) |
+| `kern/training.py` | Training: Augmentierung, Ausgleich, Early Stopping, blockweise Validierung (alle Varianten) |
+| `kern/konstanten.py`, `kern/version.py` | Netzgröße, Lenkbereich, Rückblick der Bildfolge; Code-Version (Git-Commit) |
 
 **Pi:**
 

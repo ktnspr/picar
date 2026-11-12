@@ -29,8 +29,8 @@ async function fahrtenAuswahlLaden() {
     const zeile = document.createElement("label");
     const aktiv = fahrt.kamera_modus === "aktiv";
     zeile.innerHTML = `<input type="checkbox" value="${fahrt.id}"> <b class="name"></b>
-      <span class="marke ${aktiv ? "aktiv" : ""}">${aktiv ? "aktive Kamera → C" : "feste Kamera → B"}</span>
-      <span>– ${fahrt.frames} Bilder, ${sekundenText(fahrt.dauer_s)}, Tempo ${fahrt.tempo} %,
+      <span class="marke ${aktiv ? "aktiv" : ""}">${aktiv ? "aktive Kamera" : "feste Kamera"}</span>
+      <span>– ${fahrt.frames} Bilder${fahrt.frames_nur_vorgeschichte ? ` (davon ${fahrt.frames_nur_vorgeschichte} abgedriftet)` : ""}, ${sekundenText(fahrt.dauer_s)}, Tempo ${fahrt.tempo} %,
       Kamera ${aktiv ? "" : fahrt.kamera.schwenken + "° / "}${fahrt.kamera.neigen}°, Ausschnitt ab ${Math.round(fahrt.bild.ausschnitt_oben * 100)} %,
       Kalibrierung ${fahrt.kalibrierung ? "gespeichert" : "unbekannt"}</span>`;
     zeile.querySelector(".name").textContent = fahrt.anzeigename;
@@ -48,6 +48,14 @@ function gewaehlteFahrten() {
 // Passen die ausgewählten Fahrten zusammen? Das prüft der Server (gemeinsamer Kern).
 // Nur dann lässt sich das Training starten.
 let auswahlPasst = true;
+let letztePruefung = null;
+
+// Welche Variante ist gewählt? Bei aktiver Kamera gibt es nur eine – dann ist die Auswahl versteckt.
+function gewaehlteVariante() {
+  if (!letztePruefung || !letztePruefung.varianten) return null;
+  if (letztePruefung.varianten.length === 1) return letztePruefung.varianten[0];
+  return document.querySelector("input[name=variante]:checked").value;
+}
 
 async function summeAnzeigen() {
   const gewaehlt = bekannteFahrten.filter((f) => gewaehlteFahrten().includes(f.id));
@@ -60,14 +68,21 @@ async function summeAnzeigen() {
   } else {
     const pruefung = await senden("/api/training/pruefen", { fahrten: gewaehlt.map((f) => f.id) });
     if (!pruefung) return;
+    letztePruefung = pruefung;
     auswahlPasst = pruefung.passt;
+    document.getElementById("varianten-wahl").classList.toggle("versteckt", !pruefung.passt || pruefung.varianten.length < 2);
+    document.getElementById("gedaechtnis-s").textContent = pruefung.gedaechtnis_s;
+    const variante = gewaehlteVariante();
     if (pruefung.passt) {
-      text += pruefung.variante === "C"
-        ? " Es wird ein Modell der Variante C trainiert (Bild + Schwenkwinkel, aktive Kamera)."
-        : " Es wird ein Modell der Variante B trainiert (nur Bild, feste Kamera).";
+      text += ` Es wird ein Modell der Variante „${VARIANTEN[variante].lang}“ trainiert.`;
+      if (pruefung.nur_vorgeschichte) text += ` ${pruefung.nur_vorgeschichte} abgedriftete Bilder sind nur Vorgeschichte.`;
     }
-    const meldungen = pruefung.passt ? pruefung.hinweise
+    const meldungen = pruefung.passt ? [...pruefung.hinweise]
       : ["Diese Fahrten passen nicht zusammen – so kann nicht trainiert werden:", ...pruefung.unterschiede];
+    if (pruefung.passt && variante === "bildfolge" && !pruefung.nur_vorgeschichte) {
+      meldungen.push("Die Fahrten enthalten keine Rettungsfahrten (L-Taste). Ohne sie hat das Gedächtnis " +
+                     "kaum Gelegenheit zu lernen, wohin die Linie verschwunden ist.");
+    }
     warnung.innerHTML = "";
     for (const meldung of meldungen) {
       const zeile = document.createElement("div");
@@ -84,6 +99,7 @@ document.getElementById("alle-fahrten").addEventListener("click", () => {
   document.querySelectorAll("#fahrten-auswahl input").forEach((feld) => { feld.checked = true; });
   summeAnzeigen();
 });
+for (const knopf of document.querySelectorAll("input[name=variante]")) knopf.addEventListener("change", summeAnzeigen);
 document.getElementById("keine-fahrten").addEventListener("click", () => {
   document.querySelectorAll("#fahrten-auswahl input").forEach((feld) => { feld.checked = false; });
   summeAnzeigen();
@@ -96,7 +112,8 @@ document.getElementById("keine-fahrten").addEventListener("click", () => {
 document.getElementById("training-start").addEventListener("click", async () => {
   const gruendlich = document.querySelector("input[name=gruendlich]:checked").value === "ja";
   const ort = document.querySelector("input[name=ort]:checked").value;   // "pi" oder "extern"
-  const status = await senden("/api/training/start", { fahrten: gewaehlteFahrten(), gruendlich: gruendlich, ort: ort });
+  const status = await senden("/api/training/start",
+    { fahrten: gewaehlteFahrten(), gruendlich: gruendlich, ort: ort, variante: gewaehlteVariante() });
   if (status) trainingAnzeigen(status);
 });
 document.getElementById("training-beenden").addEventListener("click", () => senden("/api/training/beenden", {}));
@@ -134,10 +151,25 @@ setInterval(async () => {
 // Liste der Modelle
 // ---------------------------------------------------------------------
 
+// Die Varianten des Netzes – benannt danach, was das Netz bekommt (siehe kern/netz.py)
+const VARIANTEN = {
+  einzelbild:             { kurz: "Einzelbild",           lang: "Einzelbild – nur das Kamerabild (feste Kamera)" },
+  bild_und_schwenkwinkel: { kurz: "Bild + Schwenkwinkel", lang: "Bild + Schwenkwinkel (aktive Kamera)" },
+  bildfolge:              { kurz: "Bildfolge",            lang: "Bildfolge – Kamerabild mit Gedächtnis (feste Kamera)" },
+};
+
 // Variante, Kamera und Kalibrierung aus dem Steckbrief (ältere Modelle kennen nicht alles)
 function varianteText(modell) {
-  if (!modell.variante) return "B (älteres Modell, ohne Angaben zur Aufnahme)";
-  return modell.variante === "C" ? "C – Bild + Schwenkwinkel (aktive Kamera)" : "B – nur Bild (feste Kamera)";
+  if (!modell.variante) return "Einzelbild (älteres Modell, ohne Angaben zur Aufnahme)";
+  let text = VARIANTEN[modell.variante].lang;
+  if (modell.folge) text += ` – schaut ${modell.folge.gedaechtnis_s} s zurück, ${modell.folge.laenge} Bilder im Abstand von ${modell.folge.abstand_s} s`;
+  return text;
+}
+
+// Bildfolge: Wie gut wäre dasselbe Auge ohne Gedächtnis? Genau dieser Vergleich zeigt, ob das Gedächtnis hilft.
+function ohneGedaechtnisText(v) {
+  return v.fehler_ohne_gedaechtnis_grad === undefined ? ""
+    : `<dt>Ohne Gedächtnis</dt><dd>${v.fehler_ohne_gedaechtnis_grad.toFixed(1)}° – Fehler desselben Auges allein (Stufe „Sehen“)</dd>`;
 }
 
 function kameraText(modell) {
@@ -187,10 +219,11 @@ async function modelleLaden() {
         <div class="name"></div>
         <dl class="modell-werte">
           <dt>Fehler (Prüfen)</dt><dd><b>${v.fehler_grad.toFixed(1)}°</b> – zum Vergleich „immer geradeaus“: ${v.vergleich_grad.toFixed(1)}°</dd>
+          ${ohneGedaechtnisText(v)}
           <dt>Prüfmethode</dt><dd>${v.methode}${v.je_durchgang.length > 1 ? " (" + v.je_durchgang.map((f) => f.toFixed(1) + "°").join(", ") + ")" : ""}</dd>
           <dt>Fahrten</dt><dd class="fahrten-namen"></dd>
-          <dt>Bilder</dt><dd>${modell.bilder_gesamt} (davon ${v.lern_bilder} Lernen / ${v.pruef_bilder} Prüfen im Probetraining)</dd>
-          <dt>Training</dt><dd>${Math.round(modell.trainingsdauer_s)} s, ${modell.epochen} Epochen, Modus ${modell.modus === "gruendlich" ? "gründlich" : "schnell"}</dd>
+          <dt>Bilder</dt><dd>${modell.bilder_gesamt} (davon ${v.lern_bilder} Lernen / ${v.pruef_bilder} Prüfen im Probetraining${modell.bilder_nur_vorgeschichte ? `, ${modell.bilder_nur_vorgeschichte} nur Vorgeschichte` : ""})</dd>
+          <dt>Training</dt><dd>${Math.round(modell.trainingsdauer_s)} s, ${modell.epochen_sehen ? `${modell.epochen_sehen} Epochen Sehen + ${modell.epochen} Epochen Erinnern` : `${modell.epochen} Epochen`}, Modus ${modell.modus === "gruendlich" ? "gründlich" : "schnell"}</dd>
           <dt>Trainiert auf</dt><dd>${trainiertAufText(modell)}</dd>
           ${modell.hinweis ? `<dt>Hinweis</dt><dd class="schlecht">${modell.hinweis}</dd>` : ""}
           <dt>Variante</dt><dd>${varianteText(modell)}</dd>

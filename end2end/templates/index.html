@@ -57,7 +57,11 @@
           </div>
           <p class="hinweis">
             Controller: <b>Stick</b> lenken · <b>A</b> anfahren/anhalten · <b>B</b> anhalten ·
-            <b>+</b> Aufnahme starten/stoppen · <b>−</b> Pause (zum Umsetzen).<br>
+            <b>+</b> Aufnahme starten/stoppen · <b>−</b> Pause (zum Umsetzen) ·
+            <b>L</b> gedrückt halten: absichtlich abdriften.<br>
+            <b>Rettungsfahrt:</b> L halten und von der Linie wegfahren, bis sie aus dem Bild ist – dann L loslassen
+            und zurücklenken. Die Bilder mit L sind nur Vorgeschichte für die Variante „Bildfolge“ und werden
+            nie als Lenkbeispiel gelernt.<br>
             Bilder werden nur gespeichert, während das Auto fährt. Während einer Aufnahme
             bleiben Geschwindigkeit, Kamerawinkel und Bildausschnitt fest. Der blaue Rahmen im Livebild
             zeigt, welchen Teil des Bildes das Netz sieht.
@@ -93,6 +97,14 @@
               <b>schnell</b> – prüft an 20 % der Daten, danach finales Modell auf allen Daten.</label>
             <label><input type="radio" name="gruendlich" value="ja">
               <b>gründlich</b> – prüft 4-mal an je einem anderen Viertel (Kreuzvalidierung). Dauert etwa 3-mal so lang.</label>
+          </div>
+          <div id="varianten-wahl" class="gruendlichkeit versteckt">
+            <b>Netz</b>
+            <label><input type="radio" name="variante" value="einzelbild" checked>
+              <b>Einzelbild</b> – lenkt nur nach dem aktuellen Bild.</label>
+            <label><input type="radio" name="variante" value="bildfolge">
+              <b>Bildfolge</b> – erinnert sich an die letzten <span id="gedaechtnis-s">4</span> Sekunden.
+              Trainiert in zwei Stufen: erst sehen (wie Einzelbild), dann erinnern.</label>
           </div>
           <div class="gruendlichkeit">
             <b>Wo trainieren?</b>

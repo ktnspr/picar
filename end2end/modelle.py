@@ -18,7 +18,7 @@ from datetime import datetime
 import torch
 
 from einstellungen import MODELLE
-from kern.netz import PilotNetKlein
+from kern.netz import EINZELBILD, netz_fuer
 
 
 def _meta_lesen(ordner):
@@ -46,7 +46,7 @@ def speichern(gewichte, meta):
     einmal in ein Netz – so fällt sofort auf, wenn sie nicht zum Netz passen.
     Ergebnis: die Modell-ID.
     """
-    PilotNetKlein(mit_schwenkwinkel=meta.get("variante") == "C").load_state_dict(gewichte)
+    netz_fuer(meta["variante"]).load_state_dict(gewichte)
     modell_id = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
     ordner = MODELLE / modell_id
     ordner.mkdir(parents=True)
@@ -60,8 +60,8 @@ def laden(modell_id):
     """Lädt ein Modell. Ergebnis: (netz, meta)."""
     ordner = modell_ordner(modell_id)
     meta = _meta_lesen(ordner)
-    # Variante C hat einen Eingang mehr (Schwenkwinkel); ältere Modelle sind immer Variante B
-    netz = PilotNetKlein(mit_schwenkwinkel=meta.get("variante") == "C")
+    # „Bild und Schwenkwinkel“ hat einen Eingang mehr; ganz alte Modelle ohne Angabe sind Einzelbild-Modelle
+    netz = netz_fuer(meta.get("variante", EINZELBILD))
     netz.load_state_dict(torch.load(ordner / "modell.pt", weights_only=True))
     netz.eval()   # Vorhersage-Modus (z. B. kein Dropout)
     return netz, meta

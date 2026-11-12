@@ -6,10 +6,15 @@ Jede Fahrt bekommt einen eigenen Ordner, benannt nach ihrem Startzeitpunkt:
     daten/fahrten/2026-10-26_14-03-12/
         meta.json      Beschreibung der Fahrt: Anzeigename, Tempo, Kamerawinkel, Bildparameter ...
         frames.csv     eine Zeile pro Bild: Dateiname, Lenkwinkel, Zeitstempel, Tempo,
-                       Kamera-Schwenkwinkel, Linienposition, „Linie sichtbar“
+                       Kamera-Schwenkwinkel, Linienposition, „Linie sichtbar“, „lernen“
         bilder/        die Kamerabilder als JPEG (000001.jpg, 000002.jpg, ...)
 
 Der Ordnername ändert sich nie. Umbenennen ändert nur den Anzeigenamen in meta.json.
+
+„lernen“ = 0 heißt: Bei diesem Bild wurde die L-Taste gehalten – das Auto driftet absichtlich
+von der Linie ab. Das Bild ist dann nur Vorgeschichte für die Variante „Bildfolge“
+(sie soll lernen, wohin die Linie verschwunden ist), aber nie Lernziel: Das Netz soll ja
+nicht lernen, von der Linie wegzufahren.
 """
 
 import csv
@@ -77,6 +82,7 @@ class Aufnahme:
         self.pausiert = False
         self.ordner = None
         self.anzahl = 0
+        self.anzahl_nur_vorgeschichte = 0   # Bilder mit gehaltener L-Taste
         self._fahrzeit = 0.0
         self._letztes_bild = 0.0
         self._csv_datei = None
@@ -113,16 +119,18 @@ class Aufnahme:
                     "aufnahme_rate": AUFNAHME_RATE,
                 },
                 "frames": 0,
+                "frames_nur_vorgeschichte": 0,   # abgedriftet (L-Taste): kein Lernziel
                 "dauer_s": 0.0,
             }
             meta_schreiben(self.ordner, self.meta)
             self._csv_datei = open(self.ordner / "frames.csv", "w", newline="")
             self._csv = csv.writer(self._csv_datei)
-            self._csv.writerow(["datei", "lenkwinkel", "zeit", "tempo", "schwenken", "linie_x", "linie_sichtbar"])
+            self._csv.writerow(["datei", "lenkwinkel", "zeit", "tempo", "schwenken", "linie_x", "linie_sichtbar", "lernen"])
             self._tempo_summe = 0
             self._fahrzeit = 0.0
             self._letzte_zeit = None
             self.anzahl = 0
+            self.anzahl_nur_vorgeschichte = 0
             self.pausiert = False
             self.laeuft = True
 
@@ -130,8 +138,9 @@ class Aufnahme:
         if self.laeuft:
             self.pausiert = not self.pausiert
 
-    def bild_speichern(self, bild, lenkwinkel, tempo, schwenken=0.0, linie=None):
-        """Speichert ein Bild – höchstens AUFNAHME_RATE-mal pro Sekunde."""
+    def bild_speichern(self, bild, lenkwinkel, tempo, schwenken=0.0, linie=None, lernen=True):
+        """Speichert ein Bild – höchstens AUFNAHME_RATE-mal pro Sekunde.
+        lernen=False: absichtlich abgedriftet (L-Taste) – nur Vorgeschichte, kein Lernziel."""
         jetzt = time.time()
         if jetzt - self._letztes_bild < 1 / AUFNAHME_RATE * 0.9:   # kleine Toleranz für den Kameratakt
             return
@@ -145,8 +154,10 @@ class Aufnahme:
                         [cv2.IMWRITE_JPEG_QUALITY, JPEG_QUALITAET])
             sichtbar = bool(linie and linie.sichtbar)
             self._csv.writerow([dateiname, round(lenkwinkel, 2), round(jetzt, 3), tempo, round(schwenken, 2),
-                                round(linie.x, 1) if sichtbar else "", int(sichtbar)])
+                                round(linie.x, 1) if sichtbar else "", int(sichtbar), int(lernen)])
             self._tempo_summe += tempo
+            if not lernen:
+                self.anzahl_nur_vorgeschichte += 1
             # Fahrzeit: nur Abstände zwischen direkt aufeinanderfolgenden Bildern zählen,
             # damit Pausen und Stillstand nicht mitgerechnet werden.
             if self._letzte_zeit is not None and jetzt - self._letzte_zeit < 0.5:
@@ -168,6 +179,7 @@ class Aufnahme:
                 shutil.rmtree(self.ordner)   # leere Fahrten nicht aufheben
                 return
             self.meta["frames"] = self.anzahl
+            self.meta["frames_nur_vorgeschichte"] = self.anzahl_nur_vorgeschichte
             self.meta["dauer_s"] = round(self.dauer(), 1)
             self.meta["tempo"] = round(self._tempo_summe / self.anzahl)
             meta_schreiben(self.ordner, self.meta)

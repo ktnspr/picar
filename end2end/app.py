@@ -33,7 +33,10 @@ from einstellungen import (AUSSCHNITT_OBEN, KAMERA_BREITE, KAMERA_NEIGEN_STANDAR
                            TEMPO_STANDARD)
 from kamera import Kamera, overlay_zeichnen
 from kern.datensatz import aufnahme_einstellungen, einheitlichkeit_pruefen
-from kern.netz import lenkwinkel_vorhersagen
+from kern.bildfolge import Gedaechtnis
+from kern.konstanten import GEDAECHTNIS_S
+from kern.netz import (BILD_UND_SCHWENKWINKEL, BILDFOLGE, EINZELBILD, bildmerkmale, lenkwinkel_aus_folge,
+                       lenkwinkel_vorhersagen, moegliche_varianten)
 from kern.version import code_version
 from kern.vorverarbeitung import netz_ausschnitt
 
@@ -120,7 +123,8 @@ autonom = {
     "lenkwinkel": None,       # letzte Vorhersage des Netzes (Grad)
     "rechenzeit_ms": None,    # so lange braucht das Netz für ein Bild
     "rate": None,             # Lenkentscheidungen pro Sekunde
-    "variante": "B",          # A = klassisch, B = CNN mit fester Kamera, C = CNN mit aktiver Kamera
+    "variante": EINZELBILD,   # Variante des gewählten Modells (siehe kern/netz.py)
+    "gedaechtnis": None,      # Variante „Bildfolge“: merkt sich die Bilder der letzten Sekunden
     "hinweise": [],           # Hinweise zum gewählten Modell (z. B. abweichende Kalibrierung)
     "tempo_modell": None,     # Geschwindigkeit, mit der die Trainingsdaten aufgenommen wurden
 }
@@ -150,7 +154,7 @@ def video():
                 continue
             bild = overlay_zeichnen(bild, zustand["anzeige_lenkwinkel"], zustand["anzeige_text"],
                                     zustand["anzeige_farbe"], zustand["ausschnitt_oben"])
-            if zustand["linie"] is not None:
+            if zustand["linie"] is not None and linie_einblenden():
                 bild = linie.overlay_linie(bild, zustand["linie"], fahrzeug.schwenken, zustand["regler_zustand"])
             ok, jpeg = cv2.imencode(".jpg", bild, [cv2.IMWRITE_JPEG_QUALITY, 80])
             yield b"--frame\r\nContent-Type: image/jpeg\r\n\r\n" + jpeg.tobytes() + b"\r\n"
@@ -213,6 +217,7 @@ def zustand_abfragen():
             "laeuft": aufnahme.laeuft,
             "pausiert": aufnahme.pausiert,
             "bilder": aufnahme.anzahl,
+            "nur_vorgeschichte": aufnahme.anzahl_nur_vorgeschichte,
             "dauer_s": round(aufnahme.dauer(), 1),
         },
     })
@@ -281,6 +286,12 @@ def kamera_ausrichten():
 # Aktive Kamera: Regelung und Einstellungen
 # ----------------------------------------------------------------------
 
+def linie_einblenden():
+    """Suchstreifen und erkannte Linie nur zeigen, während die Kamera der Linie folgt.
+    Bei fester Kamera bleibt das Livebild aufgeräumt."""
+    return regelung_aktiv() or einmessung["regler"] is not None
+
+
 def regelung_aktiv():
     """Soll die Kamera gerade der Linie folgen?"""
     if zustand["messung_laeuft"]:
@@ -288,7 +299,7 @@ def regelung_aktiv():
     if zustand["modus"] == "aufnahme":
         return zustand["kamera_modus"] == "aktiv"
     if zustand["modus"] == "autonom":
-        return autonom["variante"] in ("A", "C")
+        return autonom["variante"] == BILD_UND_SCHWENKWINKEL
     if zustand["modus"] == "kalibrierung":
         return zustand["regeltest"]
     return False
@@ -531,7 +542,8 @@ def training_starten():
         return jsonify({"fehler": "Bitte zuerst in den Modus „Trainieren“ wechseln."}), 409
     if fahrzeug.faehrt():
         return jsonify({"fehler": "Trainieren geht nur, wenn das Fahrzeug steht."}), 409
-    training.starten(request.json["fahrten"], bool(request.json["gruendlich"]), request.json.get("ort", "pi"))
+    training.starten(request.json["fahrten"], bool(request.json["gruendlich"]), request.json.get("ort", "pi"),
+                     request.json.get("variante"))
     return jsonify(training.status())
 
 
@@ -596,15 +608,16 @@ def training_pruefen():
     """Passen die ausgewählten Fahrten zusammen? Welche Variante würde trainiert?"""
     metas = [fahrten.meta_lesen(fahrten.fahrt_ordner(f)) for f in request.json["fahrten"]]
     if not metas:
-        return jsonify({"passt": False, "unterschiede": [], "variante": None})
+        return jsonify({"passt": False, "unterschiede": [], "varianten": []})
     unterschiede = einheitlichkeit_pruefen(metas)
-    variante = "C" if aufnahme_einstellungen(metas[0])["kamera_modus"] == "aktiv" else "B"
+    varianten = moegliche_varianten(aufnahme_einstellungen(metas[0])["kamera_modus"])
     hinweise = []
     if any(m.get("kalibrierung") is None for m in metas):
         hinweise.append("Bei mindestens einer Fahrt ist die Kalibrierung unbekannt (ältere Aufnahme). "
                         "Beim Fahren wird dann die aktuelle Kalibrierung verwendet.")
-    return jsonify({"passt": not unterschiede, "unterschiede": unterschiede, "variante": variante,
-                    "hinweise": hinweise})
+    return jsonify({"passt": not unterschiede, "unterschiede": unterschiede, "varianten": varianten,
+                    "hinweise": hinweise, "gedaechtnis_s": GEDAECHTNIS_S,
+                    "nur_vorgeschichte": sum(m.get("frames_nur_vorgeschichte", 0) for m in metas)})
 
 
 @app.post("/api/training/abbrechen")
@@ -697,7 +710,12 @@ def modell_einstellungen_anwenden(meta):
             kameraregler.einstellen(aufnahme["regler"])
         if aufnahme["linienerkennung"]:
             linienerkennung.einstellen(aufnahme["linienerkennung"])
-    autonom["variante"] = meta.get("variante", "B")
+    autonom["variante"] = meta.get("variante", EINZELBILD)
+    if autonom["variante"] == BILDFOLGE:
+        # Das Gedächtnis arbeitet genau wie beim Training (Rückblick und Bildabstand aus dem Steckbrief)
+        autonom["gedaechtnis"] = Gedaechtnis(meta["folge"]["laenge"], meta["folge"]["abstand_s"])
+    else:
+        autonom["gedaechtnis"] = None
     autonom["hinweise"] = hinweise
 
     zustand["schwenken_fest"] = float(aufnahme["kamera"]["schwenken"])
@@ -751,8 +769,14 @@ def autonom_schritt(bild):
 
     # Das Netz sagt den Lenkwinkel vorher – und wir messen, wie lange das dauert
     start = time.perf_counter()
-    lenkwinkel = lenkwinkel_vorhersagen(autonom["netz"], netz_ausschnitt(bild, zustand["ausschnitt_oben"]),
-                                        fahrzeug.schwenken)   # den Schwenkwinkel nutzt nur Variante C
+    netzbild = netz_ausschnitt(bild, zustand["ausschnitt_oben"])
+    if autonom["gedaechtnis"] is not None:
+        # Bildfolge: Das Auge rechnet nur das neue Bild, die früheren Merkmale stehen im Gedächtnis
+        autonom["gedaechtnis"].hinzufuegen(time.monotonic(), bildmerkmale(autonom["netz"], netzbild))
+        lenkwinkel = lenkwinkel_aus_folge(autonom["netz"], autonom["gedaechtnis"].folge())
+    else:
+        lenkwinkel = lenkwinkel_vorhersagen(autonom["netz"], netzbild,
+                                            fahrzeug.schwenken)   # den Schwenkwinkel nutzt nur „Bild und Schwenkwinkel“
     autonom["rechenzeit_ms"] = round((time.perf_counter() - start) * 1000, 1)
     jetzt = time.monotonic()
     if autonom.get("letzter_takt"):
@@ -856,14 +880,20 @@ def aufnahme_schritt(bild):
     if lenkwinkel != fahrzeug.lenkwinkel:
         fahrzeug.lenken(lenkwinkel)
 
+    # L-Taste gehalten: absichtlich abdriften – diese Bilder sind nur Vorgeschichte, kein Lernziel
+    abdriften = "L" in controller.gedrueckt
+
     # Bilder nur speichern, während das Auto wirklich fährt
     if aufnahme.laeuft and fahrzeug.faehrt():
-        aufnahme.bild_speichern(bild, fahrzeug.lenkwinkel, fahrzeug.tempo, fahrzeug.schwenken, zustand["linie"])
+        aufnahme.bild_speichern(bild, fahrzeug.lenkwinkel, fahrzeug.tempo, fahrzeug.schwenken, zustand["linie"],
+                                lernen=not abdriften)
 
     # Overlay: echter Lenkwinkel, dazu der Aufnahme-Zustand
     zustand["anzeige_lenkwinkel"] = fahrzeug.lenkwinkel
     if aufnahme.pausiert:
         zustand["anzeige_text"], zustand["anzeige_farbe"] = "PAUSE", GELB
+    elif aufnahme.laeuft and abdriften:
+        zustand["anzeige_text"], zustand["anzeige_farbe"] = "ABDRIFTEN - wird nicht gelernt", GELB
     elif aufnahme.laeuft:
         zustand["anzeige_text"], zustand["anzeige_farbe"] = f"REC  {aufnahme.anzahl} Bilder", ROT
     else:

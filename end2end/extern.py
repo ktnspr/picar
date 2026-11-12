@@ -116,17 +116,18 @@ class ExternesTraining:
         return {"laeuft": self.laeuft, "text": self.text, "fortschritt": round(self.fortschritt, 3),
                 "kurven": self.kurven, "fehler": self.fehler, "fertig": self.ergebnis_gewichte is not None}
 
-    def starten(self, fahrt_ordner, gruendlich, bei_ende=None, variante="B"):
+    def starten(self, fahrt_ordner, gruendlich, bei_ende, variante):
         self.info = info_abfragen(self.konfig)   # wirft Verbindungsfehler, wenn nicht erreichbar
         if self.info.get("beschaeftigt"):
             raise Verbindungsfehler(f"{self.info['name']} trainiert gerade schon etwas anderes.")
-        if variante not in self.info.get("varianten", ["B"]):   # ältere Dienste kennen nur Variante B
-            raise Verbindungsfehler(f"{self.info['name']} kann Variante {variante} noch nicht – bitte dort "
+        if variante not in self.info.get("varianten", []):   # ältere Dienste kennen die Varianten noch nicht
+            raise Verbindungsfehler(f"{self.info['name']} kann die Variante „{variante}“ noch nicht – bitte dort "
                                     "„git pull“ ausführen und den Dienst neu starten.")
         self.laeuft, self._abbrechen, self._beenden, self._auftrag = True, False, False, None
         self.text, self.fortschritt, self.kurven, self.fehler = "Starte ...", 0.0, {}, None
         self.ergebnis_gewichte, self.ergebnis_meta = None, None
-        threading.Thread(target=self._ausfuehren, args=(fahrt_ordner, gruendlich, bei_ende), daemon=True).start()
+        threading.Thread(target=self._ausfuehren, args=(fahrt_ordner, gruendlich, bei_ende, variante),
+                         daemon=True).start()
 
     def beenden(self):
         """Den Dienst bitten aufzuhören und das bisher beste Modell zu liefern."""
@@ -141,10 +142,10 @@ class ExternesTraining:
 
     # ------------------------------------------------------------------
 
-    def _ausfuehren(self, fahrt_ordner, gruendlich, bei_ende):
+    def _ausfuehren(self, fahrt_ordner, gruendlich, bei_ende, variante):
         name = self.info.get("name", "externer Rechner")
         try:
-            self._hochladen(fahrt_ordner, gruendlich, name)
+            self._hochladen(fahrt_ordner, gruendlich, variante, name)
             self._beobachten(name)
             if self.ergebnis_gewichte is not None and bei_ende:
                 bei_ende(self)
@@ -161,7 +162,7 @@ class ExternesTraining:
         finally:
             self.laeuft = False
 
-    def _hochladen(self, fahrt_ordner, gruendlich, name):
+    def _hochladen(self, fahrt_ordner, gruendlich, variante, name):
         """Packt die Fahrten in ein Archiv und lädt es hoch (Fortschrittsbalken 0–5 %)."""
         self.text = "Packe die Fahrten ein ..."
         with tempfile.TemporaryFile() as archiv:
@@ -184,7 +185,7 @@ class ExternesTraining:
                     yield daten
 
             einstellungen = json.dumps({"fahrten": [o.name for o in fahrt_ordner], "gruendlich": gruendlich,
-                                        "pi_version": self.pi_version})
+                                        "variante": variante, "pi_version": self.pi_version})
             antwort = _anfrage("POST", self.konfig, "/auftraege", params={"einstellungen": einstellungen},
                                data=stuecke(), timeout=120)
             self._auftrag = antwort.json()["auftrag"]

@@ -4,7 +4,8 @@ datensatz.py – Liest aufgenommene Fahrten von der Festplatte.
 Eine Fahrt ist ein Ordner mit:
     meta.json      Beschreibung (Tempo, Kamerawinkel, Bildausschnitt ...)
     frames.csv     eine Zeile pro Bild: Dateiname, Lenkwinkel, Zeitstempel, Tempo
-                   (neuere Fahrten auch: Kamera-Schwenkwinkel, Linienposition, „Linie sichtbar“)
+                   (neuere Fahrten auch: Kamera-Schwenkwinkel, Linienposition, „Linie sichtbar“,
+                   „lernen“ – 0 heißt: absichtlich abgedriftet, das Bild ist nur Vorgeschichte)
     bilder/        die Kamerabilder als JPEG
 
 Auf dem Pi liegen die Fahrten in daten/fahrten/, auf dem Mac in einem Auftragsordner.
@@ -17,6 +18,7 @@ lernen, die beim Fahren so nie wieder vorkommen.
 
 import csv
 import json
+from dataclasses import dataclass
 
 import cv2
 import numpy as np
@@ -25,6 +27,7 @@ from .konstanten import LENKUNG_MAX
 from .vorverarbeitung import netz_ausschnitt
 
 BLOCK_SEKUNDEN = 3.0      # Länge eines Blocks für die Validierung (siehe training.py)
+LUECKE_SEKUNDEN = 0.5     # längerer Abstand zwischen zwei Bildern = die Fahrt war unterbrochen
 
 # Einstellungen der Linienerkennung, die nur bei bestimmten Verfahren wirken
 NUR_BEI_VERFAHREN = {"farbe_bgr": ("farbe",), "toleranz": ("farbe",), "helligkeit_min": ("hell",),
@@ -110,15 +113,27 @@ def einheitlichkeit_pruefen(metas):
     return meldungen
 
 
+@dataclass
+class Daten:
+    """Alle Bilder der ausgewählten Fahrten – fürs Netz vorbereitet – und was zu jedem Bild gehört."""
+    bilder: np.ndarray          # Anzahl × 48 × 160 × 3
+    winkel: np.ndarray          # Lenkwinkel, −1 bis 1
+    schwenkwinkel: np.ndarray   # Schwenkwinkel der Kamera (Grad)
+    zeiten: np.ndarray          # Aufnahmezeitpunkt (Sekunden)
+    lernen: np.ndarray          # False = absichtlich abgedriftet: nur Vorgeschichte, kein Lernziel
+    bloecke: np.ndarray         # Block-Nummer (3-Sekunden-Blöcke für die Validierung)
+    abschnitte: np.ndarray      # Nummer des zusammenhängenden Fahrtabschnitts (ohne Halt dazwischen)
+    fahrt_nummern: np.ndarray
+
+
 def daten_laden(ordner_liste, melden):
     """Lädt alle Bilder der Fahrten und bildet Blöcke von je 3 Sekunden.
 
-    Ergebnis: Bilder (fürs Netz vorbereitet), Lenkwinkel (−1 bis 1), Schwenkwinkel der Kamera (Grad),
-    Block-Nummer, Fahrt-Nummer.
     melden(text) wird ab und zu mit einer Fortschrittsmeldung aufgerufen.
     """
-    bilder, winkel, schwenkwinkel, bloecke, fahrt_nummern = [], [], [], [], []
-    block = -1
+    spalten = {name: [] for name in ("bilder", "winkel", "schwenkwinkel", "zeiten", "lernen",
+                                     "bloecke", "abschnitte", "fahrt_nummern")}
+    block, abschnitt = -1, -1
     for nummer, ordner in enumerate(ordner_liste):
         meta = meta_lesen(ordner)
         ausschnitt = meta["bild"]["ausschnitt_oben"]
@@ -127,18 +142,33 @@ def daten_laden(ordner_liste, melden):
         block_beginn, letzte_zeit = None, None
         for i, zeile in enumerate(zeilen):
             zeit = float(zeile["zeit"])
+            # Neuer Abschnitt am Anfang jeder Fahrt und nach jeder Unterbrechung (Pause, Halt)
+            unterbrochen = block_beginn is None or zeit - letzte_zeit > LUECKE_SEKUNDEN
+            if unterbrochen:
+                abschnitt += 1
             # Neuer Block nach 3 Sekunden – oder wenn die Fahrt unterbrochen war
-            if block_beginn is None or zeit - block_beginn >= BLOCK_SEKUNDEN or zeit - letzte_zeit > 0.5:
+            if unterbrochen or zeit - block_beginn >= BLOCK_SEKUNDEN:
                 block += 1
                 block_beginn = zeit
             letzte_zeit = zeit
             bild = cv2.imread(str(ordner / "bilder" / zeile["datei"]))
-            bilder.append(netz_ausschnitt(bild, ausschnitt))
-            winkel.append(float(zeile["lenkwinkel"]) / LENKUNG_MAX)
-            schwenkwinkel.append(float(zeile.get("schwenken") or fester_schwenkwinkel))
-            bloecke.append(block)
-            fahrt_nummern.append(nummer)
+            spalten["bilder"].append(netz_ausschnitt(bild, ausschnitt))
+            spalten["winkel"].append(float(zeile["lenkwinkel"]) / LENKUNG_MAX)
+            spalten["schwenkwinkel"].append(float(zeile.get("schwenken") or fester_schwenkwinkel))
+            spalten["zeiten"].append(zeit)
+            spalten["lernen"].append(zeile.get("lernen", "1") != "0")   # ältere Fahrten: alles lernen
+            spalten["bloecke"].append(block)
+            spalten["abschnitte"].append(abschnitt)
+            spalten["fahrt_nummern"].append(nummer)
             if i % 200 == 0:
                 melden(f"Lade Fahrt {nummer + 1}/{len(ordner_liste)}: Bild {i}/{len(zeilen)}")
-    return (np.stack(bilder), np.array(winkel, np.float32), np.array(schwenkwinkel, np.float32),
-            np.array(bloecke), np.array(fahrt_nummern))
+    return Daten(
+        bilder=np.stack(spalten["bilder"]),
+        winkel=np.array(spalten["winkel"], np.float32),
+        schwenkwinkel=np.array(spalten["schwenkwinkel"], np.float32),
+        zeiten=np.array(spalten["zeiten"]),
+        lernen=np.array(spalten["lernen"]),
+        bloecke=np.array(spalten["bloecke"]),
+        abschnitte=np.array(spalten["abschnitte"]),
+        fahrt_nummern=np.array(spalten["fahrt_nummern"]),
+    )

@@ -98,7 +98,8 @@ function aufnahmeAnzeigen(zustand) {
   const a = zustand.aufnahme;
   const status = document.getElementById("aufnahme-status");
   if (!a.laeuft) status.textContent = "Aufnahme: aus";
-  else status.textContent = `${a.pausiert ? "PAUSE" : "● Aufnahme"} – ${a.bilder} Bilder, ${a.dauer_s} s`;
+  else status.textContent = `${a.pausiert ? "PAUSE" : "● Aufnahme"} – ${a.bilder} Bilder` +
+    (a.nur_vorgeschichte ? ` (davon ${a.nur_vorgeschichte} abgedriftet)` : "") + `, ${a.dauer_s} s`;
   status.className = a.laeuft && !a.pausiert ? "schlecht" : "";
 
   const knopf = document.getElementById("aufnahme-knopf");
@@ -150,7 +151,7 @@ async function fahrtenLaden() {
       <div>
         <div class="name"></div>
         <div class="details">
-          ${fahrt.id} · ${sekundenText(fahrt.dauer_s)} · ${fahrt.frames} Bilder<br>
+          ${fahrt.id} · ${sekundenText(fahrt.dauer_s)} · ${fahrt.frames} Bilder${fahrt.frames_nur_vorgeschichte ? ` (davon ${fahrt.frames_nur_vorgeschichte} abgedriftet)` : ""}<br>
           Tempo ${fahrt.tempo} % · Kamera ${fahrt.kamera.schwenken}° / ${fahrt.kamera.neigen}°
         </div>
       </div>

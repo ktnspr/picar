@@ -36,7 +36,7 @@ from fastapi.responses import Response
 ORDNER = Path(__file__).resolve().parent
 sys.path.insert(0, str(ORDNER.parent))
 
-from kern.netz import PilotNetKlein, bilder_zu_tensor  # noqa: E402
+from kern.netz import BILD_UND_SCHWENKWINKEL, BILDFOLGE, EINZELBILD, PilotNetKlein, bilder_zu_tensor  # noqa: E402
 from kern.konstanten import NETZ_BREITE, NETZ_HOEHE  # noqa: E402
 from kern.training import Training  # noqa: E402
 from kern.version import code_version  # noqa: E402
@@ -44,7 +44,7 @@ from kern.version import code_version  # noqa: E402
 import ankuendigung  # noqa: E402
 
 PROTOKOLL = 1                       # wird erhöht, wenn sich die Schnittstelle ändert
-VARIANTEN = ["B", "C"]              # B = nur Kamerabild, C = Kamerabild + Schwenkwinkel (aktive Kamera)
+VARIANTEN = [EINZELBILD, BILD_UND_SCHWENKWINKEL, BILDFOLGE]   # Netz-Varianten, die dieser Dienst trainieren kann
 KONFIGURATION = ORDNER / "config.json"
 ARBEITSORDNER = ORDNER / "auftraege"
 
@@ -169,7 +169,9 @@ async def auftrag_annehmen(anfrage: Request, einstellungen: str):
     """Nimmt einen Trainingsauftrag an.
 
     Inhalt der Anfrage: ein tar-Archiv mit den Fahrten (je ein Ordner).
-    einstellungen (URL-Parameter, JSON): {"fahrten": [...], "gruendlich": true/false, "pi_version": "..."}
+    einstellungen (URL-Parameter, JSON): {"fahrten": [...], "gruendlich": true/false, "variante": "...",
+                                          "pi_version": "..."}
+    Fehlt „variante“ (ältere Pi-Stände), gilt die Standard-Variante für die Fahrten.
     """
     if dienst["auftrag"] and dienst["auftrag"]["training"].laeuft:
         raise HTTPException(status_code=409, detail="Es läuft bereits ein Training.")
@@ -216,7 +218,8 @@ async def auftrag_annehmen(anfrage: Request, einstellungen: str):
 
     try:
         # prüft auch, ob die Fahrten zusammenpassen (gleiche Kalibrierung, gleiche Kameraeinstellungen)
-        training.starten(fahrt_ordner, bool(einstellungen.get("gruendlich")), bei_ende=fertig)
+        training.starten(fahrt_ordner, bool(einstellungen.get("gruendlich")), bei_ende=fertig,
+                         variante=einstellungen.get("variante"))
     except ValueError as fehler:
         shutil.rmtree(ordner, ignore_errors=True)
         raise HTTPException(status_code=400, detail=str(fehler))

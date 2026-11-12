@@ -16,6 +16,7 @@ import fahrten
 import konfiguration
 import modelle
 from kern.datensatz import aufnahme_einstellungen, einheitlichkeit_pruefen
+from kern.netz import moegliche_varianten
 from kern.training import Training
 from kern.version import code_version
 
@@ -37,7 +38,7 @@ class Trainingssteuerung:
     def status(self):
         return self.aktiv.status() | {"ergebnis": self.ergebnis, "ort": self.ort, "hinweis": self.hinweis}
 
-    def starten(self, fahrt_ids, gruendlich, ort="pi"):
+    def starten(self, fahrt_ids, gruendlich, ort="pi", variante=None):
         if self.laeuft:
             raise ValueError("Es läuft bereits ein Training.")
         ordner = [fahrten.fahrt_ordner(fahrt_id) for fahrt_id in fahrt_ids]   # prüft, ob es sie gibt
@@ -47,7 +48,10 @@ class Trainingssteuerung:
         unterschiede = einheitlichkeit_pruefen(metas)
         if unterschiede:
             raise ValueError("Die Fahrten passen nicht zusammen: " + " | ".join(unterschiede))
-        variante = "C" if aufnahme_einstellungen(metas[0])["kamera_modus"] == "aktiv" else "B"
+        erlaubt = moegliche_varianten(aufnahme_einstellungen(metas[0])["kamera_modus"])
+        variante = variante or erlaubt[0]
+        if variante not in erlaubt:
+            raise ValueError(f"Die Variante „{variante}“ passt nicht zu diesen Fahrten.")
         self.ergebnis, self.hinweis, self._startzeit = None, None, time.time()
 
         if ort == "extern":
@@ -65,7 +69,7 @@ class Trainingssteuerung:
                 self.hinweis = f"Externe Trainingsressource „{name}“ nicht verwendbar ({fehler}) – trainiere auf dem Pi."
 
         self.aktiv, self.ort = Training(geraet="cpu", threads=THREADS), "pi"
-        self.aktiv.starten(ordner, gruendlich, bei_ende=self._speichern)
+        self.aktiv.starten(ordner, gruendlich, bei_ende=self._speichern, variante=variante)
 
     def beenden(self):
         self.aktiv.beenden()
