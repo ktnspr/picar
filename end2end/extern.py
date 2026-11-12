@@ -132,12 +132,12 @@ class ExternesTraining:
     def beenden(self):
         """Den Dienst bitten aufzuhören und das bisher beste Modell zu liefern."""
         self._beenden = True   # falls der Auftrag noch hochgeladen wird: gleich danach beenden
-        if self._auftrag:
+        if self._auftrag and self.laeuft:   # ein fertiger Auftrag ist beim Dienst schon gelöscht
             _anfrage("POST", self.konfig, f"/auftraege/{self._auftrag}/beenden")
 
     def abbrechen(self):
         self._abbrechen = True
-        if self._auftrag:
+        if self._auftrag and self.laeuft:   # ein fertiger Auftrag ist beim Dienst schon gelöscht
             _anfrage("POST", self.konfig, f"/auftraege/{self._auftrag}/abbrechen")
 
     # ------------------------------------------------------------------

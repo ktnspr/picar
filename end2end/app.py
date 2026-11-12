@@ -127,6 +127,7 @@ autonom = {
     "gedaechtnis": None,      # Variante „Bildfolge“: merkt sich die Bilder der letzten Sekunden
     "hinweise": [],           # Hinweise zum gewählten Modell (z. B. abweichende Kalibrierung)
     "tempo_modell": None,     # Geschwindigkeit, mit der die Trainingsdaten aufgenommen wurden
+    "eigene_werte": None,     # Kamerawinkel, Bildausschnitt und Tempo von VOR dem Autonom-Modus
 }
 
 
@@ -245,6 +246,7 @@ def modus_wechseln():
     controller.neu_gedrueckte_tasten()   # alte Tastendrücke verwerfen – sie gehören zum alten Modus
     if zustand["modus"] == "autonom" and neuer_modus != "autonom":
         eigene_einstellungen_wiederherstellen()
+        eigene_werte_zurueckholen()
     if zustand["modus"] == "kalibrierung" and neuer_modus != "kalibrierung":
         # Die Kalibrier-Vorschau hat die Servos direkt bewegt. Jetzt wieder die
         # eingestellten Winkel anfahren – sonst stimmt der gespeicherte Kamerawinkel nicht.
@@ -718,6 +720,11 @@ def modell_einstellungen_anwenden(meta):
         autonom["gedaechtnis"] = None
     autonom["hinweise"] = hinweise
 
+    # Die eigenen Werte merken, bevor das Modell sie überschreibt – aber nur beim ersten Mal:
+    # Wer zwischendurch ein anderes Modell wählt, soll trotzdem die Werte von vorher zurückbekommen.
+    if autonom["eigene_werte"] is None:
+        autonom["eigene_werte"] = {"schwenken": zustand["schwenken_fest"], "neigen": fahrzeug.neigen,
+                                   "ausschnitt_oben": zustand["ausschnitt_oben"], "tempo": zustand["tempo"]}
     zustand["schwenken_fest"] = float(aufnahme["kamera"]["schwenken"])
     fahrzeug.kamera_ausrichten(zustand["schwenken_fest"] if aufnahme["kamera_modus"] == "fest" else 0.0,
                                float(aufnahme["kamera"]["neigen"]))
@@ -733,6 +740,18 @@ def eigene_einstellungen_wiederherstellen():
     fahrzeug.kalibrierung_aus_datei()
     kameraregler.einstellen(konfig["regler"])
     linienerkennung.einstellen(konfig["linie"])
+
+
+def eigene_werte_zurueckholen():
+    """Beim Verlassen des Autonom-Modus: Kamerawinkel, Bildausschnitt und Tempo wie vorher."""
+    werte = autonom["eigene_werte"]
+    if werte is None:
+        return   # es wurde kein Modell gewählt – dann wurde auch nichts verstellt
+    autonom["eigene_werte"] = None
+    zustand["schwenken_fest"] = werte["schwenken"]
+    zustand["ausschnitt_oben"] = werte["ausschnitt_oben"]
+    zustand["tempo"] = werte["tempo"]
+    fahrzeug.kamera_ausrichten(werte["schwenken"], werte["neigen"])
 
 
 def kalibrierung_text(k):
@@ -1037,10 +1056,12 @@ def main():
         app.run(host="0.0.0.0", port=PORT, threaded=True, debug=False, use_reloader=False)
     finally:
         print("Programm wird beendet: Motoren aus, Lenkung geradeaus.")
-        training.abbrechen()
-        aufnahme.stoppen()
-        fahrzeug.herunterfahren()
-        kamera.schliessen()
+        fahrzeug.herunterfahren()   # zuerst – die Motoren müssen aus, egal was danach schiefgeht
+        for aufraeumen in (training.abbrechen, aufnahme.stoppen, kamera.schliessen):
+            try:
+                aufraeumen()
+            except Exception as fehler:   # z. B. externe Trainingsressource nicht erreichbar
+                print("Beim Beenden:", fehler)
 
 
 if __name__ == "__main__":
